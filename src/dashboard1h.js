@@ -1,7 +1,7 @@
 // dashboard2x.js
 // @ts-nocheck
 
-// Global loader management
+// lobal loader management
 const GlobalLoader = {
     overlay: null,
     progressBar: null,
@@ -3430,7 +3430,7 @@ function initializeDashboardApp() {
                 <div class="qla-questions-section top-questions">
                     <h3>
                         <div class="title-content">
-                            <span class="icon">🏆</span> Top Performing Questions
+                            <span class="icon">🏆</span> Top Statement Responses
                         </div>
                         <button class="qla-info-btn" onclick="window.showQLAInfoModal()">i</button>
                     </h3>
@@ -3444,7 +3444,7 @@ function initializeDashboardApp() {
                 <div class="qla-questions-section bottom-questions">
                     <h3>
                         <div class="title-content">
-                            <span class="icon">⚠️</span> Questions Needing Attention
+                            <span class="icon">⚠️</span> Responses Needing Attention
                         </div>
                     </h3>
                     <div class="question-cards" id="bottom-question-cards">
@@ -3660,53 +3660,78 @@ function initializeDashboardApp() {
         }
     }
 
-    async function handleQLAChatSubmit() {
+    function handleQLAChatSubmit() {
         const inputElement = document.getElementById('qla-chat-input');
         const dropdownElement = document.getElementById('qla-question-dropdown');
         const responseContainer = document.getElementById('qla-ai-response');
 
         if (!inputElement || !dropdownElement || !responseContainer) return;
 
-        const userQuery = inputElement.value.trim();
-        const selectedQuestion = dropdownElement.value;
-        let queryForAI = userQuery;
+        let userQuery = inputElement.value.trim();
+        const selectedQuestionText = dropdownElement.value;
 
-        if (!queryForAI && selectedQuestion) {
-            queryForAI = selectedQuestion; // Use dropdown question if input is empty
+        // If user just picked from dropdown and left input blank, use that text
+        if (!userQuery && selectedQuestionText) {
+            userQuery = selectedQuestionText;
         }
 
-        if (!queryForAI) {
+        if (!userQuery) {
             responseContainer.textContent = "Please type a question or select one from the dropdown.";
             return;
         }
 
         responseContainer.textContent = "Thinking...";
-        log("Sending QLA query to AI:", queryForAI);
 
-        try {
-            // This is where you'd make a call to your Heroku backend
-            // The backend would then use the OpenAI API with the relevant question data context.
-            const aiResponse = await fetch(`${config.herokuAppUrl}/api/qla-chat`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                // Send the query AND relevant context (e.g., data for the specific question or all QLA data)
-                // Your Heroku app will need to be smart about how it uses this data with the OpenAI prompt.
-                body: JSON.stringify({ query: queryForAI, questionData: allQuestionResponses /* or more filtered data */ })
-            });
+        // Try to find matching item from the interrogation questions list (loaded earlier)
+        const matchedItem = window.interrogationQuestions?.find(q => q.question === userQuery);
 
-            if (!aiResponse.ok) {
-                const errorData = await aiResponse.json();
-                throw new Error(errorData.message || `AI request failed with status ${aiResponse.status}`);
+        // If we have metadata and it's quick-tier, fetch the numeric answer first
+        const fetchNumericAnswer = async () => {
+            if (!matchedItem || matchedItem.calcLevel !== 'quick') return null;
+
+            const analysisBody = {
+                analysisType: matchedItem.calcType,
+                questionIds: matchedItem.questionIds,
+                filters: []
+            };
+
+            try {
+                const res = await fetch(`${config.herokuAppUrl}/api/qla-analysis`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(analysisBody)
+                });
+                if (res.ok) {
+                    return await res.json();
+                }
+            } catch (err) {
+                console.error('Numeric analysis fetch error', err);
+            }
+            return null;
+        };
+
+        fetchNumericAnswer().then(numericResult => {
+            // Build prompt for AI
+            let prompt = userQuery;
+            if (numericResult) {
+                prompt = `Here are the calculated figures: ${JSON.stringify(numericResult)}.\nUser Question: ${userQuery}`;
             }
 
-            const result = await aiResponse.json();
-            responseContainer.textContent = result.answer; // Assuming your Heroku app returns { answer: "..." }
-            log("AI Response for QLA:", result.answer);
-
-        } catch (error) {
-            errorLog("Error with QLA AI chat:", error);
-            responseContainer.textContent = `Error: ${error.message}`;
-        }
+            // Call chat endpoint
+            fetch(`${config.herokuAppUrl}/api/qla-chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: prompt, questionData: [] })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    responseContainer.textContent = data.answer || 'No response';
+                })
+                .catch(err => {
+                    console.error(err);
+                    responseContainer.textContent = 'AI request failed.';
+                });
+        });
     }
 
 
