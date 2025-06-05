@@ -451,35 +451,40 @@ body.knack-body .kn-content {
     to { transform: rotate(360deg); }
 }
 
-/* --- VESPA Score Cards Grid --- */
-.vespa-scores-grid {
+/* --- Combined VESPA Score and Distribution Grid --- */
+.vespa-combined-grid {
     display: grid !important;
-    grid-template-columns: repeat(6, 1fr) !important;
-    gap: 1rem !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    grid-template-rows: auto auto auto auto !important;
+    gap: 1.5rem !important;
     margin-bottom: var(--spacing-xl);
     padding: 0;
     width: 100% !important;
-    min-width: 1200px; /* Force minimum width */
 }
 
-/* Force smaller cards on narrow screens */
-@media (max-width: 1400px) {
-    .vespa-scores-grid {
-        grid-template-columns: repeat(6, minmax(150px, 1fr)) !important;
-    }
-}
+/* Alternate between score cards and charts */
+.vespa-combined-grid > .vespa-score-card:nth-child(1) { grid-column: 1; grid-row: 1; }
+.vespa-combined-grid > .vespa-score-card:nth-child(2) { grid-column: 2; grid-row: 1; }
+.vespa-combined-grid > .vespa-score-card:nth-child(3) { grid-column: 3; grid-row: 1; }
+.vespa-combined-grid > .chart-wrapper:nth-child(4) { grid-column: 1; grid-row: 2; }
+.vespa-combined-grid > .chart-wrapper:nth-child(5) { grid-column: 2; grid-row: 2; }
+.vespa-combined-grid > .chart-wrapper:nth-child(6) { grid-column: 3; grid-row: 2; }
+.vespa-combined-grid > .vespa-score-card:nth-child(7) { grid-column: 1; grid-row: 3; }
+.vespa-combined-grid > .vespa-score-card:nth-child(8) { grid-column: 2; grid-row: 3; }
+.vespa-combined-grid > .vespa-score-card:nth-child(9) { grid-column: 3; grid-row: 3; }
+.vespa-combined-grid > .chart-wrapper:nth-child(10) { grid-column: 1; grid-row: 4; }
+.vespa-combined-grid > .chart-wrapper:nth-child(11) { grid-column: 2; grid-row: 4; }
+.vespa-combined-grid > .chart-wrapper:nth-child(12) { grid-column: 3; grid-row: 4; }
 
 @media (max-width: 1200px) {
-    .vespa-scores-grid {
-        grid-template-columns: repeat(3, 1fr) !important;
-        min-width: auto;
+    .vespa-combined-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
     }
 }
 
 @media (max-width: 768px) {
-    .vespa-scores-grid {
-        grid-template-columns: repeat(2, 1fr) !important;
-        min-width: auto;
+    .vespa-combined-grid {
+        grid-template-columns: 1fr !important;
     }
 }
 
@@ -488,10 +493,9 @@ body.knack-body .kn-content {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
-    padding: 0.75rem;
-    padding-top: 1.5rem; /* Extra padding to account for top button */
-    min-height: 120px;
-    height: 120px;
+    padding: 1.5rem 1rem 2rem 1rem; /* More padding, especially bottom */
+    min-height: 140px;
+    height: 140px;
     position: relative;
     overflow: hidden;
     display: flex;
@@ -539,26 +543,27 @@ body.knack-body .kn-content {
 }
 
 .vespa-score-card .score-value {
-    font-size: 2.2rem;
+    font-size: 2.8rem;
     font-weight: 900;
     line-height: 1;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.5rem;
     z-index: 1;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
     transition: transform 0.3s ease;
 }
 
 .vespa-score-card .national-comparison {
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     background: rgba(0, 0, 0, 0.5);
-    padding: 0.2rem 0.5rem;
+    padding: 0.3rem 0.6rem;
     border-radius: var(--radius-sm);
     backdrop-filter: blur(10px);
     z-index: 1;
     display: flex;
     align-items: center;
-    gap: 0.2rem;
+    gap: 0.3rem;
     white-space: nowrap;
+    margin-top: 0.5rem;
 }
 
 .vespa-score-card .national-comparison .arrow {
@@ -611,64 +616,71 @@ body.knack-body .kn-content {
     height: 16px;
 }
 
-/* Individual card colors with glow effects */
-.vespa-score-card:nth-child(1) { 
+/* Individual card colors with glow effects - Combined Grid */
+/* Row 1 - Vision, Effort, Systems */
+.vespa-combined-grid > .vespa-score-card:nth-child(1), 
+.vespa-combined-grid > .chart-wrapper:nth-child(4) { 
     color: var(--vision-color); 
     box-shadow: var(--shadow-glow) var(--vision-glow);
 }
-.vespa-score-card:nth-child(2) { 
+.vespa-combined-grid > .vespa-score-card:nth-child(2),
+.vespa-combined-grid > .chart-wrapper:nth-child(5) { 
     color: var(--effort-color); 
     box-shadow: var(--shadow-glow) var(--effort-glow);
 }
-.vespa-score-card:nth-child(3) { 
+.vespa-combined-grid > .vespa-score-card:nth-child(3),
+.vespa-combined-grid > .chart-wrapper:nth-child(6) { 
     color: var(--systems-color); 
     box-shadow: var(--shadow-glow) var(--systems-glow);
 }
-.vespa-score-card:nth-child(4) { 
+
+/* Row 2 - Practice, Attitude, Overall */
+.vespa-combined-grid > .vespa-score-card:nth-child(7),
+.vespa-combined-grid > .chart-wrapper:nth-child(10) { 
     color: var(--practice-color); 
     box-shadow: var(--shadow-glow) var(--practice-glow);
 }
-.vespa-score-card:nth-child(5) { 
+.vespa-combined-grid > .vespa-score-card:nth-child(8),
+.vespa-combined-grid > .chart-wrapper:nth-child(11) { 
     color: var(--attitude-color); 
     box-shadow: var(--shadow-glow) var(--attitude-glow);
 }
-.vespa-score-card:nth-child(6) { 
+.vespa-combined-grid > .vespa-score-card:nth-child(9),
+.vespa-combined-grid > .chart-wrapper:nth-child(12) { 
     color: var(--overall-color); 
     box-shadow: var(--shadow-glow) var(--overall-glow);
 }
 
-/* --- Distribution Charts Container --- */
-#distribution-charts-container {
-    display: grid !important;
-    grid-template-columns: repeat(3, 1fr) !important;
-    grid-template-rows: repeat(2, 1fr) !important;
-    gap: 1rem !important;
-    margin-bottom: var(--spacing-xl);
-    width: 100% !important;
-    min-width: 900px; /* Force minimum width */
+/* Visual connection between score cards and charts */
+.vespa-combined-grid > .chart-wrapper {
+    margin-top: -0.5rem; /* Slightly overlap to create connection */
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
 }
 
-@media (min-width: 1200px) {
-    .chart-wrapper {
-        min-height: 280px;
-        height: 280px;
-    }
+/* Adjust score cards when they're above charts */
+.vespa-combined-grid > .vespa-score-card {
+    margin-bottom: 0;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom: none;
 }
 
-@media (max-width: 1200px) {
-    #distribution-charts-container {
-        grid-template-columns: repeat(2, 1fr) !important;
-        grid-template-rows: repeat(3, 1fr) !important;
-        min-width: auto;
-    }
+/* Add rounded corners back for the bottom row */
+.vespa-combined-grid > .chart-wrapper:nth-child(10),
+.vespa-combined-grid > .chart-wrapper:nth-child(11),
+.vespa-combined-grid > .chart-wrapper:nth-child(12) {
+    border-bottom-left-radius: var(--radius-lg);
+    border-bottom-right-radius: var(--radius-lg);
 }
 
-@media (max-width: 768px) {
-    #distribution-charts-container {
-        grid-template-columns: repeat(1, 1fr) !important;
-        grid-template-rows: auto !important;
-        min-width: auto;
-    }
+/* Add top corners for score cards in row 3 */
+.vespa-combined-grid > .vespa-score-card:nth-child(7),
+.vespa-combined-grid > .vespa-score-card:nth-child(8),
+.vespa-combined-grid > .vespa-score-card:nth-child(9) {
+    margin-top: var(--spacing-lg);
+    border-top-left-radius: var(--radius-lg);
+    border-top-right-radius: var(--radius-lg);
 }
 
 /* --- Chart Wrapper --- */
@@ -676,9 +688,9 @@ body.knack-body .kn-content {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
-    padding: 1rem;
-    min-height: 260px;
-    height: auto;
+    padding: 1.5rem;
+    min-height: 280px;
+    height: 280px;
     position: relative;
     overflow: hidden;
     transition: all 0.3s ease;
@@ -883,8 +895,9 @@ body.knack-body .kn-content {
     border-bottom: 2px solid var(--border-color);
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     gap: 0.75rem;
+    position: relative;
 }
 
 .qla-questions-section h3 .title-content {
@@ -898,6 +911,10 @@ body.knack-body .kn-content {
 }
 
 .qla-info-btn {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
     width: 32px;
     height: 32px;
     display: flex;
@@ -917,7 +934,7 @@ body.knack-body .kn-content {
     background: rgba(59, 130, 246, 0.3);
     border-color: var(--accent-primary);
     color: var(--text-primary);
-    transform: scale(1.1);
+    transform: translateY(-50%) scale(1.1);
 }
 
 .qla-questions-section.top-questions h3 {
@@ -957,7 +974,9 @@ body.knack-body .kn-content {
 }
 
 .question-card {
-    flex: 0 0 300px;
+    flex: 1 1 250px; /* Allow cards to grow and shrink, with 250px base */
+    min-width: 200px; /* Minimum width to maintain readability */
+    max-width: 350px; /* Maximum width to prevent cards from being too wide */
     background: var(--card-bg);
     border-radius: 12px;
     padding: 1.25rem;
@@ -968,10 +987,44 @@ body.knack-body .kn-content {
     overflow: hidden;
 }
 
-@media (min-width: 1400px) {
+/* For larger screens, allow more flexibility */
+@media (min-width: 1200px) {
+    .question-cards {
+        overflow-x: visible; /* Remove horizontal scroll on larger screens */
+        flex-wrap: nowrap; /* Keep cards in one row */
+    }
+    
     .question-card {
-        flex: 1;
-        min-width: 250px;
+        flex: 1 1 0; /* Equal width distribution */
+        max-width: none; /* Remove max-width constraint */
+    }
+}
+
+/* For medium screens, wrap to 2 rows if needed */
+@media (max-width: 1199px) and (min-width: 768px) {
+    .question-cards {
+        flex-wrap: wrap;
+        overflow-x: visible;
+        justify-content: space-between;
+    }
+    
+    .question-card {
+        flex: 0 1 calc(50% - 0.5rem); /* 2 cards per row */
+        max-width: none;
+    }
+}
+
+/* For small screens, stack vertically */
+@media (max-width: 767px) {
+    .question-cards {
+        flex-direction: column;
+        overflow-x: visible;
+    }
+    
+    .question-card {
+        flex: 1 1 auto;
+        max-width: none;
+        width: 100%;
     }
 }
 
@@ -1318,19 +1371,19 @@ body.knack-body .kn-content {
     animation-fill-mode: both;
 }
 
-.vespa-score-card:nth-child(1) { animation-delay: 0.1s; }
-.vespa-score-card:nth-child(2) { animation-delay: 0.2s; }
-.vespa-score-card:nth-child(3) { animation-delay: 0.3s; }
-.vespa-score-card:nth-child(4) { animation-delay: 0.4s; }
-.vespa-score-card:nth-child(5) { animation-delay: 0.5s; }
-.vespa-score-card:nth-child(6) { animation-delay: 0.6s; }
-
-.chart-wrapper:nth-child(1) { animation-delay: 0.7s; }
-.chart-wrapper:nth-child(2) { animation-delay: 0.8s; }
-.chart-wrapper:nth-child(3) { animation-delay: 0.9s; }
-.chart-wrapper:nth-child(4) { animation-delay: 1.0s; }
-.chart-wrapper:nth-child(5) { animation-delay: 1.1s; }
-.chart-wrapper:nth-child(6) { animation-delay: 1.2s; }
+/* Animation delays for combined grid */
+.vespa-combined-grid > *:nth-child(1) { animation-delay: 0.1s; }
+.vespa-combined-grid > *:nth-child(2) { animation-delay: 0.2s; }
+.vespa-combined-grid > *:nth-child(3) { animation-delay: 0.3s; }
+.vespa-combined-grid > *:nth-child(4) { animation-delay: 0.4s; }
+.vespa-combined-grid > *:nth-child(5) { animation-delay: 0.5s; }
+.vespa-combined-grid > *:nth-child(6) { animation-delay: 0.6s; }
+.vespa-combined-grid > *:nth-child(7) { animation-delay: 0.7s; }
+.vespa-combined-grid > *:nth-child(8) { animation-delay: 0.8s; }
+.vespa-combined-grid > *:nth-child(9) { animation-delay: 0.9s; }
+.vespa-combined-grid > *:nth-child(10) { animation-delay: 1.0s; }
+.vespa-combined-grid > *:nth-child(11) { animation-delay: 1.1s; }
+.vespa-combined-grid > *:nth-child(12) { animation-delay: 1.2s; }
 
 /* --- Scrollbar Styling --- */
 ::-webkit-scrollbar {
@@ -1368,21 +1421,35 @@ body.knack-body .kn-content {
     }
     
     .vespa-score-card {
-        min-height: 100px;
-        height: 100px;
+        min-height: 120px;
+        height: 120px;
+        padding: 1rem 0.75rem 1.5rem 0.75rem;
     }
     
     .vespa-score-card .score-value {
-        font-size: 1.8rem;
+        font-size: 2.2rem;
     }
     
     .vespa-score-card h3 {
-        font-size: 0.6rem;
+        font-size: 0.7rem;
     }
     
     .chart-wrapper {
-        min-height: 200px;
-        height: auto;
+        min-height: 220px;
+        height: 220px;
+    }
+    
+    /* Re-add rounded corners for mobile */
+    .vespa-combined-grid > .vespa-score-card {
+        border-radius: var(--radius-lg);
+        border-bottom: 1px solid var(--border-color);
+        margin-bottom: 0;
+    }
+    
+    .vespa-combined-grid > .chart-wrapper {
+        border-radius: var(--radius-lg);
+        margin-top: 0;
+        margin-bottom: var(--spacing-md);
     }
 }
 
@@ -2266,332 +2333,3 @@ body.knack-body .kn-content {
         grid-template-columns: 1fr;
     }
 }
-
-/* --- Enhanced QLA Section Styles --- */
-.qla-top-bottom-container {
-    display: flex;
-    flex-direction: column;
-    gap: 2.5rem;
-    margin-bottom: 2rem;
-}
-
-.qla-questions-section {
-    width: 100%;
-}
-
-.qla-questions-section h3 {
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin-bottom: 1.5rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 2px solid var(--border-color);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-}
-
-.qla-questions-section h3 .title-content {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.qla-questions-section h3 .icon {
-    font-size: 1.8rem;
-}
-
-.qla-info-btn {
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(59, 130, 246, 0.2);
-    border: 2px solid rgba(59, 130, 246, 0.4);
-    border-radius: 50%;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-weight: bold;
-    font-size: 14px;
-    color: var(--text-secondary);
-}
-
-.qla-info-btn:hover {
-    background: rgba(59, 130, 246, 0.3);
-    border-color: var(--accent-primary);
-    color: var(--text-primary);
-    transform: scale(1.1);
-}
-
-.qla-questions-section.top-questions h3 {
-    color: var(--accent-success);
-    border-bottom-color: var(--accent-success);
-}
-
-.qla-questions-section.bottom-questions h3 {
-    color: var(--accent-danger);
-    border-bottom-color: var(--accent-danger);
-}
-
-.question-cards {
-    display: flex;
-    gap: 1rem;
-    overflow-x: auto;
-    padding-bottom: 0.5rem;
-}
-
-/* Custom scrollbar for question cards */
-.question-cards::-webkit-scrollbar {
-    height: 6px;
-}
-
-.question-cards::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 3px;
-}
-
-.question-cards::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 3px;
-}
-
-.question-cards::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-
-.question-card {
-    flex: 0 0 300px;
-    background: var(--card-bg);
-    border-radius: 12px;
-    padding: 1.25rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    border: 1px solid var(--border-color);
-    position: relative;
-    overflow: hidden;
-}
-
-@media (min-width: 1400px) {
-    .question-card {
-        flex: 1;
-        min-width: 250px;
-    }
-}
-
-.question-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 4px;
-    height: 100%;
-    background: currentColor;
-    transition: width 0.3s ease;
-}
-
-.question-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-    border-color: currentColor;
-}
-
-.question-card:hover::before {
-    width: 6px;
-}
-
-.question-card .question-rank {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    width: 32px;
-    height: 32px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 1rem;
-    color: var(--text-secondary);
-}
-
-.question-card .question-text {
-    font-size: 0.95rem;
-    color: var(--text-primary);
-    margin-bottom: 1rem;
-    padding-right: 3rem;
-    line-height: 1.5;
-}
-
-.question-card .score-section {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-}
-
-.score-indicator {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--score-color);
-}
-
-.mini-chart-container {
-    flex: 1;
-    height: 40px;
-    position: relative;
-}
-
-.mini-chart-container canvas {
-    max-width: 100%;
-    height: 100%;
-}
-
-.question-card .stats-details {
-    display: flex;
-    gap: 1.5rem;
-    margin-top: 0.75rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    font-size: 0.8rem;
-    color: var(--text-muted);
-}
-
-.question-card .stat-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.question-card .stat-label {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 0.2rem;
-}
-
-.question-card .stat-value {
-    font-weight: 600;
-    color: var(--text-secondary);
-}
-
-/* Color coding for score ranges */
-.question-card.excellent {
-    color: #10b981;
-}
-
-.question-card.good {
-    color: #3b82f6;
-}
-
-.question-card.average {
-    color: #f59e0b;
-}
-
-.question-card.poor {
-    color: #ef4444;
-}
-
-/* QLA Info Modal */
-.qla-info-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.8);
-    backdrop-filter: blur(10px);
-    z-index: 10000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.3s ease;
-    padding: var(--spacing-md);
-}
-
-.qla-info-modal.active {
-    opacity: 1;
-    visibility: visible;
-}
-
-.qla-info-content {
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-xl);
-    max-width: 600px;
-    width: 100%;
-    max-height: 90vh;
-    overflow-y: auto;
-    transform: scale(0.9);
-    transition: transform 0.3s ease;
-}
-
-.qla-info-modal.active .qla-info-content {
-    transform: scale(1);
-}
-
-.qla-info-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: var(--spacing-lg);
-    padding-bottom: var(--spacing-md);
-    border-bottom: 1px solid var(--border-color);
-}
-
-.qla-info-header h3 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0;
-}
-
-.qla-info-close {
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 50%;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.qla-info-close:hover {
-    background: rgba(255, 255, 255, 0.2);
-    transform: rotate(90deg);
-}
-
-.qla-term {
-    margin-bottom: var(--spacing-lg);
-}
-
-.qla-term h4 {
-    color: var(--text-primary);
-    font-size: 1.1rem;
-    font-weight: 600;
-    margin-bottom: var(--spacing-sm);
-}
-
-.qla-term p {
-    color: var(--text-secondary);
-    line-height: 1.6;
-    margin-bottom: var(--spacing-sm);
-}
-
-.qla-term .example {
-    margin-top: var(--spacing-sm);
-    padding: var(--spacing-sm);
-    background: var(--secondary-bg);
-    border-radius: var(--radius-sm);
-    font-size: 0.9rem;
-    color: var(--text-muted);
-    font-style: italic;
-} 

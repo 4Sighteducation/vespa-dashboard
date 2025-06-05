@@ -711,29 +711,8 @@ function initializeDashboardApp() {
                         <div class="spinner"></div>
                     </div>
                     <div class="dashboard-content-wrapper">
-                        <div id="averages-summary-container" class="vespa-scores-grid">
-                            <!-- Scorecards will be dynamically inserted here -->
-                        </div>
-                        <div id="distribution-charts-container">
-                            <!-- Containers for Vision, Effort, Systems, Practice, Attitude, Overall -->
-                            <div class="chart-wrapper">
-                                <canvas id="vision-distribution-chart"></canvas>
-                            </div>
-                            <div class="chart-wrapper">
-                                <canvas id="effort-distribution-chart"></canvas>
-                            </div>
-                            <div class="chart-wrapper">
-                                <canvas id="systems-distribution-chart"></canvas>
-                            </div>
-                            <div class="chart-wrapper">
-                                <canvas id="practice-distribution-chart"></canvas>
-                            </div>
-                            <div class="chart-wrapper">
-                                <canvas id="attitude-distribution-chart"></canvas>
-                            </div>
-                            <div class="chart-wrapper">
-                                <canvas id="overall-distribution-chart"></canvas>
-                            </div>
+                        <div id="vespa-combined-container" class="vespa-combined-grid">
+                            <!-- Score cards and charts will be dynamically inserted here in alternating pattern -->
                         </div>
                     </div>
                 </section>
@@ -1899,12 +1878,10 @@ function initializeDashboardApp() {
     async function loadOverviewData(staffAdminId, cycle = 1, additionalFilters = [], establishmentId = null) {
         log(`Loading overview data with Staff Admin ID: ${staffAdminId}, Establishment ID: ${establishmentId} for Cycle: ${cycle}`);
         const loadingIndicator = document.getElementById('loading-indicator');
-        const averagesContainer = document.getElementById('averages-summary-container');
-        const distributionContainer = document.getElementById('distribution-charts-container');
+        const combinedContainer = document.getElementById('vespa-combined-container');
 
         if (loadingIndicator) loadingIndicator.style.display = 'block';
-        if (averagesContainer) averagesContainer.style.display = 'none'; // Hide while loading
-        if (distributionContainer) distributionContainer.style.display = 'none'; // Hide while loading
+        if (combinedContainer) combinedContainer.style.display = 'none'; // Hide while loading
 
         try {
             // Use batch endpoint to fetch all data at once
@@ -1973,8 +1950,7 @@ function initializeDashboardApp() {
             if(overviewSection) overviewSection.innerHTML = "<p>Error loading overview data. Please check console.</p>";
         } finally {
             if (loadingIndicator) loadingIndicator.style.display = 'none';
-            if (averagesContainer) averagesContainer.style.display = 'block'; // Show again
-            if (distributionContainer) distributionContainer.style.display = 'block'; // Show again
+            if (combinedContainer) combinedContainer.style.display = 'grid'; // Show again with grid display
         }
     }
 
@@ -2237,22 +2213,23 @@ function initializeDashboardApp() {
     }
 
     function renderAveragesChart(schoolData, nationalData, cycle) {
-        const container = document.getElementById('averages-summary-container');
+        // Note: This function now only creates the score cards
+        // The distribution charts will be created after this function is called
+        const container = document.getElementById('vespa-combined-container');
         if (!container) {
-            errorLog("Averages summary container not found");
+            errorLog("VESPA combined container not found");
             return;
         }
-        container.innerHTML = ''; // Clear previous content
 
-        log(`Rendering averages scorecards for Cycle ${cycle}. School:`, schoolData, "National:", nationalData);
+        log(`Creating score cards for Cycle ${cycle}. School:`, schoolData, "National:", nationalData);
 
         const elementsToDisplay = [
-            { key: 'vision', name: 'VISION' },
-            { key: 'effort', name: 'EFFORT' },
-            { key: 'systems', name: 'SYSTEMS' },
-            { key: 'practice', name: 'PRACTICE' },
-            { key: 'attitude', name: 'ATTITUDE' },
-            { key: 'overall', name: 'OVERALL' } // Assuming 'overall' is available in schoolData and nationalData
+            { key: 'vision', name: 'VISION', position: 1 },
+            { key: 'effort', name: 'EFFORT', position: 2 },
+            { key: 'systems', name: 'SYSTEMS', position: 3 },
+            { key: 'practice', name: 'PRACTICE', position: 7 },
+            { key: 'attitude', name: 'ATTITUDE', position: 8 },
+            { key: 'overall', name: 'OVERALL', position: 9 }
         ];
 
         const defaultThemeColors = {
@@ -2272,7 +2249,8 @@ function initializeDashboardApp() {
 
             const card = document.createElement('div');
             card.className = 'vespa-score-card';
-            // Remove inline backgroundColor style to let CSS handle the colors via nth-child
+            card.id = `score-card-${element.key}`;
+            card.dataset.position = element.position; // Store position for ordering
 
             let percentageDiffText = '';
             let arrow = '';
@@ -2291,8 +2269,6 @@ function initializeDashboardApp() {
                 }
             }
 
-            // Determine if overall score should have different decimal places (e.g., 1 vs 2 for others)
-            // The image shows scores like 6, 6.3, 5.4, 6.1, 5.9 - mostly one decimal place.
             const scoreToDisplay = (typeof schoolScore === 'number') ? schoolScore.toFixed(1) : 'N/A';
             const nationalScoreToDisplay = (typeof nationalScore === 'number') ? nationalScore.toFixed(1) : 'N/A';
 
@@ -2308,12 +2284,10 @@ function initializeDashboardApp() {
                     National: ${nationalScoreToDisplay} <span class="arrow ${arrowClass}">${arrow}</span> ${percentageDiffText}
                 </div>
             `;
-            container.appendChild(card);
-        });
-        
-        // Add event listeners for advanced stats buttons
-        container.querySelectorAll('.advanced-stats-btn').forEach(btn => {
-            btn.addEventListener('click', handleAdvancedStatsClick);
+            
+            // Store the card temporarily, we'll add them in the correct order later
+            window.tempScoreCards = window.tempScoreCards || {};
+            window.tempScoreCards[element.key] = card;
         });
     }
 
@@ -2914,24 +2888,89 @@ function initializeDashboardApp() {
     };
 
     let vespaDistributionChartInstances = {}; // To store multiple chart instances
-
-    function renderDistributionCharts(schoolResults, nationalAveragesData, themeColorsConfig, cycle, nationalDistributions) {
-        const container = document.getElementById('distribution-charts-container');
+    
+    function renderCombinedVespaDisplay(cycle, nationalDistributions) {
+        const container = document.getElementById('vespa-combined-container');
         if (!container) {
-            errorLog("Distribution charts container not found");
+            errorLog("VESPA combined container not found");
             return;
         }
-        log(`Rendering distribution charts for Cycle ${cycle}.`);
+        
+        // Clear previous content
+        container.innerHTML = '';
+        
+        // Get all the temporary elements
+        const scoreCards = window.tempScoreCards || {};
+        const chartWrappers = window.tempChartWrappers || {};
+        
+        // Define the order and mapping
+        const elementOrder = [
+            { type: 'card', key: 'vision', position: 1 },
+            { type: 'card', key: 'effort', position: 2 },
+            { type: 'card', key: 'systems', position: 3 },
+            { type: 'chart', key: 'vision', position: 4 },
+            { type: 'chart', key: 'effort', position: 5 },
+            { type: 'chart', key: 'systems', position: 6 },
+            { type: 'card', key: 'practice', position: 7 },
+            { type: 'card', key: 'attitude', position: 8 },
+            { type: 'card', key: 'overall', position: 9 },
+            { type: 'chart', key: 'practice', position: 10 },
+            { type: 'chart', key: 'attitude', position: 11 },
+            { type: 'chart', key: 'overall', position: 12 }
+        ];
+        
+        // Add elements in order
+        elementOrder.forEach(item => {
+            if (item.type === 'card' && scoreCards[item.key]) {
+                container.appendChild(scoreCards[item.key]);
+            } else if (item.type === 'chart' && chartWrappers[item.key]) {
+                container.appendChild(chartWrappers[item.key].wrapper);
+            }
+        });
+        
+        // Now create all the charts after DOM elements are in place
+        Object.keys(chartWrappers).forEach(key => {
+            const chartData = chartWrappers[key];
+            const canvasId = `${key}-distribution-chart`;
+            
+            createSingleHistogram(
+                canvasId,
+                chartData.title,
+                chartData.scoreDistribution,
+                chartData.nationalAverage,
+                chartData.color,
+                cycle,
+                chartData.key,
+                nationalDistributions
+            );
+        });
+        
+        // Add event listeners for advanced stats buttons
+        container.querySelectorAll('.advanced-stats-btn').forEach(btn => {
+            btn.addEventListener('click', handleAdvancedStatsClick);
+        });
+        
+        // Clean up temporary storage
+        window.tempScoreCards = null;
+        window.tempChartWrappers = null;
+        
+        log("Combined VESPA display rendered successfully");
+    }
+
+    function renderDistributionCharts(schoolResults, nationalAveragesData, themeColorsConfig, cycle, nationalDistributions) {
+        log(`Creating distribution charts for Cycle ${cycle}.`);
 
         // VESPA elements and their corresponding field prefixes in Object_10 for historical data
         const vespaElements = [
-            { name: 'Vision', key: 'vision', color: themeColorsConfig?.vision || '#ff8f00', fieldCycle1: 'field_155', fieldCycle2: 'field_161', fieldCycle3: 'field_167' },
-            { name: 'Effort', key: 'effort', color: themeColorsConfig?.effort || '#86b4f0', fieldCycle1: 'field_156', fieldCycle2: 'field_162', fieldCycle3: 'field_168' },
-            { name: 'Systems', key: 'systems', color: themeColorsConfig?.systems || '#72cb44', fieldCycle1: 'field_157', fieldCycle2: 'field_163', fieldCycle3: 'field_169' },
-            { name: 'Practice', key: 'practice', color: themeColorsConfig?.practice || '#7f31a4', fieldCycle1: 'field_158', fieldCycle2: 'field_164', fieldCycle3: 'field_170' },
-            { name: 'Attitude', key: 'attitude', color: themeColorsConfig?.attitude || '#f032e6', fieldCycle1: 'field_159', fieldCycle2: 'field_165', fieldCycle3: 'field_171' },
-            { name: 'Overall', key: 'overall', color: themeColorsConfig?.overall || '#ffd93d', fieldCycle1: 'field_160', fieldCycle2: 'field_166', fieldCycle3: 'field_172' }
+            { name: 'Vision', key: 'vision', color: themeColorsConfig?.vision || '#ff8f00', fieldCycle1: 'field_155', fieldCycle2: 'field_161', fieldCycle3: 'field_167', position: 4 },
+            { name: 'Effort', key: 'effort', color: themeColorsConfig?.effort || '#86b4f0', fieldCycle1: 'field_156', fieldCycle2: 'field_162', fieldCycle3: 'field_168', position: 5 },
+            { name: 'Systems', key: 'systems', color: themeColorsConfig?.systems || '#72cb44', fieldCycle1: 'field_157', fieldCycle2: 'field_163', fieldCycle3: 'field_169', position: 6 },
+            { name: 'Practice', key: 'practice', color: themeColorsConfig?.practice || '#7f31a4', fieldCycle1: 'field_158', fieldCycle2: 'field_164', fieldCycle3: 'field_170', position: 10 },
+            { name: 'Attitude', key: 'attitude', color: themeColorsConfig?.attitude || '#f032e6', fieldCycle1: 'field_159', fieldCycle2: 'field_165', fieldCycle3: 'field_171', position: 11 },
+            { name: 'Overall', key: 'overall', color: themeColorsConfig?.overall || '#ffd93d', fieldCycle1: 'field_160', fieldCycle2: 'field_166', fieldCycle3: 'field_172', position: 12 }
         ];
+
+        window.tempChartWrappers = window.tempChartWrappers || {};
 
         vespaElements.forEach(element => {
             const scoreDistribution = Array(11).fill(0); // For scores 0-10
@@ -2952,10 +2991,31 @@ function initializeDashboardApp() {
             const canvasId = `${element.key}-distribution-chart`;
             let chartTitle = `${element.name} Score Distribution - Cycle ${cycle}`;
 
-            log(`For ${element.name} Distribution - National Avg: ${nationalAverageForElement}`); // Log national average for this element
+            log(`For ${element.name} Distribution - National Avg: ${nationalAverageForElement}`);
 
-            createSingleHistogram(canvasId, chartTitle, scoreDistribution, nationalAverageForElement, element.color, cycle, element.key, nationalDistributions);
+            // Create chart wrapper element
+            const chartWrapper = document.createElement('div');
+            chartWrapper.className = 'chart-wrapper';
+            chartWrapper.id = `chart-wrapper-${element.key}`;
+            chartWrapper.dataset.position = element.position;
+            
+            const canvas = document.createElement('canvas');
+            canvas.id = canvasId;
+            chartWrapper.appendChild(canvas);
+            
+            // Store the wrapper temporarily
+            window.tempChartWrappers[element.key] = {
+                wrapper: chartWrapper,
+                scoreDistribution,
+                nationalAverage: nationalAverageForElement,
+                color: element.color,
+                title: chartTitle,
+                key: element.key
+            };
         });
+        
+        // Now combine everything in the right order
+        renderCombinedVespaDisplay(cycle, nationalDistributions);
     }
 
     function createSingleHistogram(canvasId, title, schoolScoreDistribution, nationalAverageScore, color, cycle, elementKey, nationalDistributions) {
