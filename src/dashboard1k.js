@@ -179,6 +179,11 @@ function initializeDashboardApp() {
             url += `&fields=${encodeURIComponent(JSON.stringify(options.fields))}`;
         }
 
+        // Pass through custom page cap override if provided (e.g., max_pages=0 for unlimited)
+        if (options.max_pages !== undefined) {
+            url += `&max_pages=${options.max_pages}`;
+        }
+
         log("Fetching from backend URL:", url); 
         try {
             const response = await fetch(url);
@@ -3331,11 +3336,16 @@ function initializeDashboardApp() {
             const questions = await response.json(); 
             window.interrogationQuestions = questions;
 
-            dropdown.innerHTML = '<option value="">Select a question...</option>'; // Clear previous/add default
-            questions.forEach(qObj => { // Assuming backend sends array of {id, question}
+            dropdown.innerHTML = '<option value="">Select a question...</option>'; // Reset
+
+            // Use the question *id* as the option value so we can reliably look-up calc metadata later
+            questions.forEach(qObj => {
+                if (!qObj || !qObj.id) return;
+
                 const option = document.createElement('option');
-                option.value = qObj.question; // Use the question text itself as value, or qObj.id if you prefer
-                option.textContent = qObj.question;
+                option.value = qObj.id;               // reliable key
+                option.textContent = qObj.question;   // human-readable text
+                option.setAttribute('data-question-text', qObj.question);
                 dropdown.appendChild(option);
             });
             log("Populated QLA question dropdown.");
@@ -3669,11 +3679,21 @@ function initializeDashboardApp() {
         if (!inputElement || !dropdownElement || !responseContainer) return;
 
         let userQuery = inputElement.value.trim();
-        const selectedQuestionText = dropdownElement.value;
 
-        // If user just picked from dropdown and left input blank, use that text
-        if (!userQuery && selectedQuestionText) {
-            userQuery = selectedQuestionText;
+        // Determine which question (if any) was selected in the dropdown
+        const selectedQuestionId = dropdownElement.value;
+        let matchedItem = null;
+
+        if (selectedQuestionId) {
+            matchedItem = window.interrogationQuestions?.find(q => q.id === selectedQuestionId);
+            if (!userQuery && matchedItem) {
+                userQuery = matchedItem.question; // use canonical wording
+            }
+        }
+
+        // Fallback: try to match typed text exactly (legacy behaviour)
+        if (!matchedItem && userQuery) {
+            matchedItem = window.interrogationQuestions?.find(q => q.question === userQuery);
         }
 
         if (!userQuery) {
@@ -3683,8 +3703,10 @@ function initializeDashboardApp() {
 
         responseContainer.textContent = "Thinking...";
 
-        // Try to find matching item from the interrogation questions list (loaded earlier)
-        const matchedItem = window.interrogationQuestions?.find(q => q.question === userQuery);
+        // If still not matched (e.g., user typed exact text), try a final lookup
+        if (!matchedItem) {
+            matchedItem = window.interrogationQuestions?.find(q => q.question === userQuery);
+        }
 
         // If we have metadata and it's quick-tier, fetch the numeric answer first
         const fetchNumericAnswer = async () => {
@@ -3693,7 +3715,7 @@ function initializeDashboardApp() {
             const analysisBody = {
                 analysisType: matchedItem.calcType,
                 questionIds: matchedItem.questionIds,
-                filters: []
+                filters: selectedEstablishmentId ? [{ field: 'field_1821', operator: 'is', value: selectedEstablishmentId }] : []
             };
 
             try {
