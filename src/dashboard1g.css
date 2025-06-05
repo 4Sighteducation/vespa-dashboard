@@ -798,11 +798,16 @@ body.knack-body .kn-content {
 }
 
 /* --- QLA Section --- */
+#qla-section {
+    max-width: 100%;
+    overflow: visible; /* Allow child elements to manage their own overflow */
+}
+
 #qla-controls {
     display: grid;
     grid-template-columns: 2fr 2fr 1fr;
     gap: var(--spacing-md);
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: var(--spacing-xl);
     width: 100%;
     max-width: 100%;
 }
@@ -879,55 +884,18 @@ body.knack-body .kn-content {
 }
 
 #qla-top-bottom-questions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-lg);
+    display: flex;
+    flex-direction: column; /* Stack vertically for full width */
+    gap: var(--spacing-xl);
     margin-top: var(--spacing-lg);
     width: 100%;
     max-width: 100%;
     overflow: hidden;
 }
 
-@media (max-width: 768px) {
-    #qla-top-bottom-questions {
-        grid-template-columns: 1fr;
-    }
-}
-
-#qla-top-bottom-questions h3 {
-    font-size: 1.2rem;
-    color: var(--text-primary);
-    margin-bottom: var(--spacing-md);
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-}
-
-#qla-top-bottom-questions h3::before {
-    content: '▸';
-    color: var(--accent-primary);
-    font-size: 1.5rem;
-}
-
+/* Legacy list styles - kept for backward compatibility but hidden */
 #qla-top-bottom-questions ul {
-    list-style: none;
-    padding: 0;
-}
-
-#qla-top-bottom-questions ul li {
-    padding: var(--spacing-sm);
-    margin-bottom: var(--spacing-sm);
-    background: var(--secondary-bg);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border-color);
-    font-size: 0.95rem;
-    color: var(--text-secondary);
-    transition: all 0.3s ease;
-}
-
-#qla-top-bottom-questions ul li:hover {
-    border-color: var(--accent-primary);
-    transform: translateX(5px);
+    display: none;
 }
 
 /* --- Enhanced QLA Section Styles --- */
@@ -938,28 +906,33 @@ body.knack-body .kn-content {
     margin-bottom: 2rem;
     width: 100%;
     max-width: 100%;
-    overflow: hidden; /* Prevent container overflow */
 }
 
 .qla-questions-section {
     width: 100%;
     max-width: 100%;
-    overflow: hidden; /* Prevent section overflow */
+    position: relative;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-md);
 }
 
 .qla-questions-section h3 {
     font-size: 1.4rem;
     font-weight: 700;
     color: var(--text-primary);
-    margin-bottom: 1.5rem;
-    padding-bottom: 0.75rem;
+    margin: calc(-1 * var(--spacing-lg)) calc(-1 * var(--spacing-lg)) var(--spacing-md) calc(-1 * var(--spacing-lg));
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: rgba(255, 255, 255, 0.03);
     border-bottom: 2px solid var(--border-color);
     display: flex;
     align-items: center;
-    justify-content: center; /* Ensure center alignment */
+    justify-content: center;
     gap: 0.75rem;
     position: relative;
-    text-align: center; /* Fallback text alignment */
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
 .qla-questions-section h3 .title-content {
@@ -999,14 +972,26 @@ body.knack-body .kn-content {
     transform: translateY(-50%) scale(1.1);
 }
 
+.qla-questions-section.top-questions {
+    border-color: rgba(16, 185, 129, 0.3);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), var(--card-bg));
+}
+
 .qla-questions-section.top-questions h3 {
     color: var(--accent-success);
-    border-bottom-color: var(--accent-success);
+    border-bottom-color: rgba(16, 185, 129, 0.5);
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.qla-questions-section.bottom-questions {
+    border-color: rgba(239, 68, 68, 0.3);
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.05), var(--card-bg));
 }
 
 .qla-questions-section.bottom-questions h3 {
     color: var(--accent-danger);
-    border-bottom-color: var(--accent-danger);
+    border-bottom-color: rgba(239, 68, 68, 0.5);
+    background: rgba(239, 68, 68, 0.1);
 }
 
 .question-cards {
@@ -1014,14 +999,30 @@ body.knack-body .kn-content {
     gap: 1rem;
     overflow-x: auto;
     overflow-y: hidden;
-    padding-bottom: 0.5rem;
+    padding: 1rem 0.5rem;
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
     width: 100%;
-    max-width: 100%;
-    /* Ensure the scrollable area is contained */
-    margin-left: 0;
-    margin-right: 0;
+    margin: 0 -0.5rem; /* Negative margin to extend to edges */
+    position: relative;
+}
+
+/* Scroll hint gradient */
+.question-cards::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 50px;
+    background: linear-gradient(to right, transparent, var(--card-bg));
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.question-cards:hover::after {
+    opacity: 1;
 }
 
 /* Custom scrollbar for question cards */
@@ -1044,16 +1045,18 @@ body.knack-body .kn-content {
 }
 
 .question-card {
-    flex: 0 0 280px; /* Fixed width for consistent card size */
-    min-width: 260px;
-    background: var(--card-bg);
+    flex: 0 0 320px; /* Slightly wider cards */
+    min-width: 300px;
+    max-width: 400px;
+    background: var(--secondary-bg); /* Different bg from section */
     border-radius: 12px;
-    padding: 1.25rem;
+    padding: 1.5rem;
     cursor: pointer;
     transition: all 0.3s ease;
     border: 1px solid var(--border-color);
     position: relative;
     overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 /* For larger screens, make cards bigger */
@@ -1072,16 +1075,11 @@ body.knack-body .kn-content {
     }
 }
 
-/* For screens that can fit all cards without scroll */
+/* For screens that can fit multiple cards */
 @media (min-width: 1200px) {
     .question-cards {
-        justify-content: space-between;
-    }
-    
-    /* If container is wide enough, distribute cards evenly */
-    .qla-questions-section:has(.question-cards:not(:hover)) .question-card {
-        flex: 1 1 300px; /* Allow growth but maintain minimum */
-        max-width: 400px; /* Prevent cards from getting too wide */
+        justify-content: flex-start; /* Keep cards left-aligned */
+        padding: 1rem;
     }
 }
 
@@ -1101,17 +1099,13 @@ body.knack-body .kn-content {
 @media (max-width: 767px) {
     .question-cards {
         gap: 0.75rem;
-        /* Remove negative margins that cause overflow */
-        margin-left: 0;
-        margin-right: 0;
-        padding-left: 0;
-        padding-right: 0.5rem; /* Small padding for last card */
+        margin: 0;
+        padding: 0.5rem 0;
     }
     
     .question-card {
-        flex: 0 0 calc(90vw - 2rem); /* Card width accounts for container padding */
+        flex: 0 0 calc(85vw - 2rem); /* Card width accounts for container padding */
         min-width: 240px;
-        max-width: 320px;
     }
 }
 
@@ -1461,31 +1455,43 @@ body.knack-body .kn-content {
 /* Responsive adjustments for QLA */
 @media (max-width: 768px) {
     .qla-top-bottom-container {
-        flex-direction: column;
-        padding: 0; /* Remove extra padding on mobile */
+        gap: 1.5rem;
     }
     
     .qla-questions-section {
-        width: 100%;
-        max-width: 100%;
+        padding: var(--spacing-md);
+        margin-bottom: var(--spacing-sm);
+    }
+    
+    .qla-questions-section h3 {
+        font-size: 1.2rem;
+        margin: calc(-1 * var(--spacing-md)) calc(-1 * var(--spacing-md)) var(--spacing-sm) calc(-1 * var(--spacing-md));
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+    
+    .question-cards {
+        margin: 0;
+        padding: 0.5rem 0;
     }
     
     .question-card {
-        padding: 1rem;
+        flex: 0 0 280px;
+        min-width: 260px;
+        padding: 1.25rem;
     }
     
     .question-card .question-text {
-        font-size: 0.9rem; /* Slightly larger on mobile */
+        font-size: 0.9rem;
         padding-right: 2.5rem;
-        word-wrap: break-word; /* Ensure long text wraps */
+        word-wrap: break-word;
     }
     
     .score-indicator {
-        font-size: 1.8rem; /* Slightly larger than before */
+        font-size: 1.8rem;
     }
     
     .question-card .stats-details {
-        gap: 1rem; /* Less gap on mobile */
+        gap: 1rem;
     }
     
     .question-card .stat-value {
