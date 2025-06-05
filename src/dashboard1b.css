@@ -865,12 +865,13 @@ body.knack-body .kn-content {
 /* --- Enhanced QLA Section Styles --- */
 .qla-top-bottom-container {
     display: flex;
-    gap: 2rem;
+    flex-direction: column;
+    gap: 2.5rem;
     margin-bottom: 2rem;
 }
 
 .qla-questions-section {
-    flex: 1;
+    width: 100%;
 }
 
 .qla-questions-section h3 {
@@ -882,11 +883,41 @@ body.knack-body .kn-content {
     border-bottom: 2px solid var(--border-color);
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.qla-questions-section h3 .title-content {
+    display: flex;
+    align-items: center;
     gap: 0.75rem;
 }
 
 .qla-questions-section h3 .icon {
     font-size: 1.8rem;
+}
+
+.qla-info-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(59, 130, 246, 0.2);
+    border: 2px solid rgba(59, 130, 246, 0.4);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: bold;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.qla-info-btn:hover {
+    background: rgba(59, 130, 246, 0.3);
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+    transform: scale(1.1);
 }
 
 .qla-questions-section.top-questions h3 {
@@ -901,12 +932,32 @@ body.knack-body .kn-content {
 
 .question-cards {
     display: flex;
-    flex-direction: column;
     gap: 1rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+}
+
+/* Custom scrollbar for question cards */
+.question-cards::-webkit-scrollbar {
+    height: 6px;
+}
+
+.question-cards::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+}
+
+.question-cards::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+
+.question-cards::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
 }
 
 .question-card {
-    flex: 1;
+    flex: 0 0 300px;
     background: var(--card-bg);
     border-radius: 12px;
     padding: 1.25rem;
@@ -915,6 +966,13 @@ body.knack-body .kn-content {
     border: 1px solid var(--border-color);
     position: relative;
     overflow: hidden;
+}
+
+@media (min-width: 1400px) {
+    .question-card {
+        flex: 1;
+        min-width: 250px;
+    }
 }
 
 .question-card::before {
@@ -1095,6 +1153,108 @@ body.knack-body .kn-content {
     border-radius: 50%;
     animation: spin 1s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
     margin-bottom: 1rem;
+}
+
+/* QLA Info Modal */
+.qla-info-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(10px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    padding: var(--spacing-md);
+}
+
+.qla-info-modal.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.qla-info-content {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xl);
+    max-width: 600px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+}
+
+.qla-info-modal.active .qla-info-content {
+    transform: scale(1);
+}
+
+.qla-info-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.qla-info-header h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.qla-info-close {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.qla-info-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: rotate(90deg);
+}
+
+.qla-term {
+    margin-bottom: var(--spacing-lg);
+}
+
+.qla-term h4 {
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: var(--spacing-sm);
+}
+
+.qla-term p {
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: var(--spacing-sm);
+}
+
+.qla-term .example {
+    margin-top: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    background: var(--secondary-bg);
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    font-style: italic;
 }
 
 /* Responsive adjustments for QLA */

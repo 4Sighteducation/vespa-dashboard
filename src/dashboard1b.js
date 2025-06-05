@@ -2819,6 +2819,100 @@ function initializeDashboardApp() {
         }
     };
 
+    // QLA Info Modal Functions
+    window.showQLAInfoModal = function() {
+        let modal = document.querySelector('.qla-info-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.className = 'qla-info-modal';
+            modal.innerHTML = `
+                <div class="qla-info-content">
+                    <div class="qla-info-header">
+                        <h3>Understanding QLA Statistics</h3>
+                        <button class="qla-info-close" onclick="window.hideQLAInfoModal()">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 6L6 18M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="qla-info-body">
+                        <div class="qla-term">
+                            <h4>Average Score</h4>
+                            <p>The mean score for this question on a scale of 1-5, where:</p>
+                            <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                                <li>1 = Strongly Disagree</li>
+                                <li>2 = Disagree</li>
+                                <li>3 = Neutral</li>
+                                <li>4 = Agree</li>
+                                <li>5 = Strongly Agree</li>
+                            </ul>
+                            <div class="example">Example: A score of 4.11 means students generally agree with this statement.</div>
+                        </div>
+                        
+                        <div class="qla-term">
+                            <h4>Responses</h4>
+                            <p>The total number of students who answered this specific question. Not all students may answer every question, so this number can vary between questions.</p>
+                            <div class="example">Example: "9 responses" means only 9 students provided an answer to this particular question.</div>
+                        </div>
+                        
+                        <div class="qla-term">
+                            <h4>Standard Deviation (Std Dev)</h4>
+                            <p>Measures how much student responses vary from the average. A lower value means students generally agree with each other, while a higher value indicates more diverse opinions.</p>
+                            <div class="example">Example: A Std Dev of 0.87 suggests most students gave similar answers, while 1.5+ would indicate more disagreement.</div>
+                        </div>
+                        
+                        <div class="qla-term">
+                            <h4>Mode</h4>
+                            <p>The most frequently selected answer. This shows you what the majority of students chose for this question.</p>
+                            <div class="example">Example: If the mode is "5", it means more students selected "Strongly Agree" than any other option.</div>
+                        </div>
+                        
+                        <div class="qla-term">
+                            <h4>Mini Bar Chart</h4>
+                            <p>Shows the distribution of responses across all 5 answer choices. Taller bars indicate more students selected that option.</p>
+                            <div class="example">This helps you quickly see if responses are clustered around certain values or spread out.</div>
+                        </div>
+                        
+                        <div class="qla-term">
+                            <h4>Color Coding</h4>
+                            <p>Questions are color-coded based on their average score:</p>
+                            <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                                <li><span style="color: #10b981;">● Green (4.0+)</span> - Excellent performance</li>
+                                <li><span style="color: #3b82f6;">● Blue (3.0-3.9)</span> - Good performance</li>
+                                <li><span style="color: #f59e0b;">● Orange (2.0-2.9)</span> - Average, needs attention</li>
+                                <li><span style="color: #ef4444;">● Red (Below 2.0)</span> - Poor, urgent attention needed</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // Add click outside to close
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    window.hideQLAInfoModal();
+                }
+            });
+        }
+        
+        // Show modal with animation
+        requestAnimationFrame(() => {
+            modal.classList.add('active');
+        });
+    };
+
+    window.hideQLAInfoModal = function() {
+        const modal = document.querySelector('.qla-info-modal');
+        if (modal) {
+            modal.classList.remove('active');
+            // Remove after animation
+            setTimeout(() => {
+                modal.remove();
+            }, 300);
+        }
+    };
+
     let vespaDistributionChartInstances = {}; // To store multiple chart instances
 
     function renderDistributionCharts(schoolResults, nationalAveragesData, themeColorsConfig, cycle, nationalDistributions) {
@@ -3274,7 +3368,12 @@ function initializeDashboardApp() {
         container.innerHTML = `
             <div class="qla-top-bottom-container">
                 <div class="qla-questions-section top-questions">
-                    <h3><span class="icon">🏆</span> Top Performing Questions</h3>
+                    <h3>
+                        <div class="title-content">
+                            <span class="icon">🏆</span> Top Performing Questions
+                        </div>
+                        <button class="qla-info-btn" onclick="window.showQLAInfoModal()">i</button>
+                    </h3>
                     <div class="question-cards" id="top-question-cards">
                         <div class="qla-loading">
                             <div class="spinner"></div>
@@ -3283,7 +3382,11 @@ function initializeDashboardApp() {
                     </div>
                 </div>
                 <div class="qla-questions-section bottom-questions">
-                    <h3><span class="icon">⚠️</span> Questions Needing Attention</h3>
+                    <h3>
+                        <div class="title-content">
+                            <span class="icon">⚠️</span> Questions Needing Attention
+                        </div>
+                    </h3>
                     <div class="question-cards" id="bottom-question-cards">
                         <div class="qla-loading">
                             <div class="spinner"></div>
