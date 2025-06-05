@@ -1939,9 +1939,17 @@ function initializeDashboardApp() {
             // Update response statistics using cached data
             updateResponseStatsFromCache(schoolVespaResults, cycle);
             
-            // ERI data is already calculated in batch response
-            const schoolERI = batchData.schoolERI;
-            const nationalERI = batchData.nationalERI || 3.5; // Default if not available
+            // Fetch ERI values (batch may not include them for large schools)
+            let schoolERI = batchData.schoolERI;
+            let nationalERI = batchData.nationalERI;
+
+            if (!schoolERI || schoolERI.value === undefined || schoolERI.value === null) {
+                schoolERI = await calculateSchoolERI(staffAdminId, cycle, additionalFilters, establishmentId);
+            }
+
+            if (nationalERI === undefined || nationalERI === null) {
+                nationalERI = await getNationalERI(cycle);
+            }
             
             GlobalLoader.updateProgress(80, 'Rendering visualizations...');
             
