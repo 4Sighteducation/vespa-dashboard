@@ -3329,6 +3329,7 @@ function initializeDashboardApp() {
                 throw new Error(errorData.message || 'Failed to fetch interrogation questions');
             }
             const questions = await response.json(); 
+            window.interrogationQuestions = questions;
 
             dropdown.innerHTML = '<option value="">Select a question...</option>'; // Clear previous/add default
             questions.forEach(qObj => { // Assuming backend sends array of {id, question}
