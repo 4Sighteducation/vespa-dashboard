@@ -462,6 +462,19 @@ body.knack-body .kn-content {
     width: 100% !important;
 }
 
+/* Scale grid gap for larger screens */
+@media (min-width: 1600px) {
+    .vespa-combined-grid {
+        gap: 2rem !important;
+    }
+}
+
+@media (min-width: 1920px) {
+    .vespa-combined-grid {
+        gap: 2.5rem !important;
+    }
+}
+
 /* Alternate between score cards and charts */
 .vespa-combined-grid > .vespa-score-card:nth-child(1) { grid-column: 1; grid-row: 1; }
 .vespa-combined-grid > .vespa-score-card:nth-child(2) { grid-column: 2; grid-row: 1; }
@@ -495,7 +508,7 @@ body.knack-body .kn-content {
     border-radius: var(--radius-lg);
     padding: 1.5rem 1rem 2rem 1rem; /* More padding, especially bottom */
     min-height: 140px;
-    height: 140px;
+    height: clamp(140px, 15vh, 220px); /* Dynamic height */
     position: relative;
     overflow: hidden;
     display: flex;
@@ -690,10 +703,24 @@ body.knack-body .kn-content {
     border-radius: var(--radius-lg);
     padding: 1.5rem;
     min-height: 280px;
-    height: 280px;
+    height: clamp(280px, 30vh, 450px); /* Dynamic height based on viewport */
     position: relative;
     overflow: hidden;
     transition: all 0.3s ease;
+}
+
+/* Larger screens - scale up charts */
+@media (min-width: 1600px) {
+    .chart-wrapper {
+        height: clamp(350px, 35vh, 500px);
+        padding: 2rem;
+    }
+}
+
+@media (min-width: 1920px) {
+    .chart-wrapper {
+        height: clamp(400px, 40vh, 550px);
+    }
 }
 
 .chart-wrapper::before {
@@ -722,8 +749,9 @@ body.knack-body .kn-content {
 .chart-wrapper canvas {
     position: relative;
     z-index: 1;
-    max-width: 100%;
-    height: auto !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: calc(100% - 2rem); /* Account for title space */
 }
 
 /* --- Sections --- */
@@ -895,9 +923,10 @@ body.knack-body .kn-content {
     border-bottom: 2px solid var(--border-color);
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: center; /* Ensure center alignment */
     gap: 0.75rem;
     position: relative;
+    text-align: center; /* Fallback text alignment */
 }
 
 .qla-questions-section h3 .title-content {
@@ -952,6 +981,8 @@ body.knack-body .kn-content {
     gap: 1rem;
     overflow-x: auto;
     padding-bottom: 0.5rem;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
 }
 
 /* Custom scrollbar for question cards */
@@ -974,9 +1005,8 @@ body.knack-body .kn-content {
 }
 
 .question-card {
-    flex: 1 1 250px; /* Allow cards to grow and shrink, with 250px base */
-    min-width: 200px; /* Minimum width to maintain readability */
-    max-width: 350px; /* Maximum width to prevent cards from being too wide */
+    flex: 0 0 280px; /* Fixed width for consistent card size */
+    min-width: 260px;
     background: var(--card-bg);
     border-radius: 12px;
     padding: 1.25rem;
@@ -987,44 +1017,61 @@ body.knack-body .kn-content {
     overflow: hidden;
 }
 
-/* For larger screens, allow more flexibility */
-@media (min-width: 1200px) {
-    .question-cards {
-        overflow-x: visible; /* Remove horizontal scroll on larger screens */
-        flex-wrap: nowrap; /* Keep cards in one row */
-    }
-    
+/* For larger screens, make cards bigger */
+@media (min-width: 1600px) {
     .question-card {
-        flex: 1 1 0; /* Equal width distribution */
-        max-width: none; /* Remove max-width constraint */
+        flex: 0 0 320px;
+        min-width: 300px;
+        padding: 1.5rem;
     }
 }
 
-/* For medium screens, wrap to 2 rows if needed */
-@media (max-width: 1199px) and (min-width: 768px) {
+@media (min-width: 1920px) {
+    .question-card {
+        flex: 0 0 360px;
+        min-width: 340px;
+    }
+}
+
+/* For screens that can fit all cards without scroll */
+@media (min-width: 1200px) {
     .question-cards {
-        flex-wrap: wrap;
-        overflow-x: visible;
         justify-content: space-between;
     }
     
-    .question-card {
-        flex: 0 1 calc(50% - 0.5rem); /* 2 cards per row */
-        max-width: none;
+    /* If container is wide enough, distribute cards evenly */
+    .qla-questions-section:has(.question-cards:not(:hover)) .question-card {
+        flex: 1 1 300px; /* Allow growth but maintain minimum */
+        max-width: 400px; /* Prevent cards from getting too wide */
     }
 }
 
-/* For small screens, stack vertically */
+/* For medium screens, show 2-3 cards */
+@media (max-width: 1199px) and (min-width: 768px) {
+    .question-card {
+        flex: 0 0 calc(50% - 0.5rem);
+        min-width: 280px;
+    }
+    
+    .question-cards {
+        flex-wrap: nowrap; /* Keep horizontal scroll */
+    }
+}
+
+/* For small screens, ensure cards are visible */
 @media (max-width: 767px) {
     .question-cards {
-        flex-direction: column;
-        overflow-x: visible;
+        gap: 0.75rem;
+        margin-left: -1rem;
+        margin-right: -1rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
     }
     
     .question-card {
-        flex: 1 1 auto;
-        max-width: none;
-        width: 100%;
+        flex: 0 0 85vw; /* Card takes up most of viewport width */
+        min-width: 240px;
+        max-width: 320px;
     }
 }
 
@@ -1071,6 +1118,29 @@ body.knack-body .kn-content {
     margin-bottom: 1rem;
     padding-right: 3rem;
     line-height: 1.5;
+    min-height: 3em; /* Ensure consistent height */
+}
+
+/* Scale text for larger screens */
+@media (min-width: 1600px) {
+    .question-card .question-text {
+        font-size: 1.05rem;
+        line-height: 1.6;
+    }
+    
+    .score-indicator {
+        font-size: 2.2rem;
+    }
+}
+
+@media (min-width: 1920px) {
+    .question-card .question-text {
+        font-size: 1.1rem;
+    }
+    
+    .score-indicator {
+        font-size: 2.5rem;
+    }
 }
 
 .question-card .score-section {
@@ -1078,6 +1148,7 @@ body.knack-body .kn-content {
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
+    margin-bottom: 0.75rem; /* Add space before stats */
 }
 
 .score-indicator {
@@ -1088,13 +1159,36 @@ body.knack-body .kn-content {
 
 .mini-chart-container {
     flex: 1;
-    height: 40px;
+    height: 60px;
+    min-height: 60px;
+    max-width: 120px;
     position: relative;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+    padding: 4px;
+}
+
+/* Scale up mini charts on larger screens */
+@media (min-width: 1600px) {
+    .mini-chart-container {
+        height: 70px;
+        min-height: 70px;
+        max-width: 140px;
+    }
+}
+
+@media (min-width: 1920px) {
+    .mini-chart-container {
+        height: 80px;
+        min-height: 80px;
+        max-width: 160px;
+    }
 }
 
 .mini-chart-container canvas {
-    max-width: 100%;
-    height: 100%;
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
 }
 
 .question-card .stats-details {
@@ -1111,6 +1205,7 @@ body.knack-body .kn-content {
     display: flex;
     flex-direction: column;
     align-items: center;
+    flex: 1; /* Equal width distribution */
 }
 
 .question-card .stat-label {
@@ -1118,11 +1213,24 @@ body.knack-body .kn-content {
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 0.2rem;
+    opacity: 0.8;
 }
 
 .question-card .stat-value {
     font-weight: 600;
     color: var(--text-secondary);
+    font-size: 0.95rem; /* Larger for better readability */
+}
+
+/* Scale stats for larger screens */
+@media (min-width: 1600px) {
+    .question-card .stat-label {
+        font-size: 0.75rem;
+    }
+    
+    .question-card .stat-value {
+        font-size: 1.05rem;
+    }
 }
 
 /* Color coding for score ranges */
@@ -1321,12 +1429,20 @@ body.knack-body .kn-content {
     }
     
     .question-card .question-text {
-        font-size: 0.85rem;
+        font-size: 0.9rem; /* Slightly larger on mobile */
         padding-right: 2.5rem;
     }
     
     .score-indicator {
-        font-size: 1.5rem;
+        font-size: 1.8rem; /* Slightly larger than before */
+    }
+    
+    .question-card .stats-details {
+        gap: 1rem; /* Less gap on mobile */
+    }
+    
+    .question-card .stat-value {
+        font-size: 0.9rem;
     }
 }
 
@@ -2331,5 +2447,31 @@ body.knack-body .kn-content {
     
     .stats-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+/* Scale up for larger screens */
+@media (min-width: 1600px) {
+    .vespa-score-card {
+        height: clamp(160px, 18vh, 250px);
+        padding: 2rem 1.25rem 2.5rem 1.25rem;
+    }
+    
+    .vespa-score-card .score-value {
+        font-size: 3.2rem;
+    }
+    
+    .vespa-score-card h3 {
+        font-size: 0.85rem;
+    }
+}
+
+@media (min-width: 1920px) {
+    .vespa-score-card {
+        height: clamp(180px, 20vh, 280px);
+    }
+    
+    .vespa-score-card .score-value {
+        font-size: 3.5rem;
     }
 }

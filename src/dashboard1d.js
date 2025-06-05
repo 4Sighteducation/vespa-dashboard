@@ -633,7 +633,7 @@ function initializeDashboardApp() {
                                     <div class="eri-title">Exam Readiness Index</div>
                                     <div class="eri-values">
                                         <span class="eri-school-value">School: <strong id="eri-value-display">-</strong></span>
-                                        <span class="eri-national-value">National: <strong id="eri-national-display">-</strong></span>
+                                        <span class="eri-national-value">Global: <strong id="eri-national-display">-</strong></span>
                                     </div>
                                     <div class="eri-interpretation" id="eri-interpretation-text">Loading...</div>
                                 </div>
@@ -1546,7 +1546,7 @@ function initializeDashboardApp() {
                         ctx.fillText(schoolValue.toFixed(1), centerX, centerY - 10);
                     }
                     
-                    // Draw national average marker if available
+                    // Draw global benchmark marker if available
                     if (nationalValue) {
                         // Calculate angle for national value position
                         // The gauge goes from 1 to 5, displayed as a 180-degree arc
@@ -1580,7 +1580,7 @@ function initializeDashboardApp() {
                         ctx.font = 'bold 10px Inter';
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'bottom';
-                        ctx.fillText('Nat', markerX, markerY - 15);
+                        ctx.fillText('Global', markerX, markerY - 15);
                     }
                     
                     ctx.restore();
@@ -1724,7 +1724,7 @@ function initializeDashboardApp() {
                                 </div>
                             </div>
                             <div style="text-align: center;">
-                                <div style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.5rem;">National Average</div>
+                                <div style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.5rem;">Global Benchmark</div>
                                 <div style="font-size: 2rem; font-weight: 700; color: var(--text-secondary);">
                                     ${nationalValue ? nationalValue.toFixed(1) : 'N/A'}
                                 </div>
@@ -2221,7 +2221,7 @@ function initializeDashboardApp() {
             return;
         }
 
-        log(`Creating score cards for Cycle ${cycle}. School:`, schoolData, "National:", nationalData);
+        log(`Creating score cards for Cycle ${cycle}. School:`, schoolData, "Global:", nationalData);
 
         const elementsToDisplay = [
             { key: 'vision', name: 'VISION', position: 1 },
@@ -2263,9 +2263,9 @@ function initializeDashboardApp() {
                 percentageDiffText = `${diff.toFixed(1)}%`;
             } else if (schoolScore !== null && typeof schoolScore !== 'undefined') {
                 if (nationalScore === 0) {
-                    percentageDiffText = 'Nat Avg 0';
+                    percentageDiffText = 'Global Avg 0';
                 } else {
-                    percentageDiffText = 'Nat N/A';
+                    percentageDiffText = 'Global N/A';
                 }
             }
 
@@ -2281,7 +2281,7 @@ function initializeDashboardApp() {
                 <h3>${element.name}</h3>
                 <div class="score-value">${scoreToDisplay}</div>
                 <div class="national-comparison">
-                    National: ${nationalScoreToDisplay} <span class="arrow ${arrowClass}">${arrow}</span> ${percentageDiffText}
+                    Global: ${nationalScoreToDisplay} <span class="arrow ${arrowClass}">${arrow}</span> ${percentageDiffText}
                 </div>
             `;
             
@@ -2535,7 +2535,7 @@ function initializeDashboardApp() {
         content.innerHTML = `
             <div class="stats-comparison">
                 ${schoolStats ? generateStatsSection('Your School', schoolStats, nationalStats, 'school') : ''}
-                ${nationalStats ? generateStatsSection('National Benchmark', nationalStats, null, 'national') : ''}
+                ${nationalStats ? generateStatsSection('Global Benchmark', nationalStats, null, 'national') : ''}
                 ${schoolStats && nationalStats ? generateInsights(schoolStats, nationalStats, elementKey) : ''}
             </div>
         `;
@@ -2626,13 +2626,13 @@ function initializeDashboardApp() {
             const diff = ((schoolStats.mean - nationalStats.mean) / nationalStats.mean * 100).toFixed(1);
             insights.push({
                 type: 'success',
-                text: `Your school's average is ${diff}% above the national average`
+                text: `Your school's average is ${diff}% above the global benchmark`
             });
         } else if (schoolStats.mean < nationalStats.mean) {
             const diff = ((nationalStats.mean - schoolStats.mean) / nationalStats.mean * 100).toFixed(1);
             insights.push({
                 type: 'warning',
-                text: `Your school's average is ${diff}% below the national average`
+                text: `Your school's average is ${diff}% below the global benchmark`
             });
         }
 
@@ -2640,12 +2640,12 @@ function initializeDashboardApp() {
         if (schoolStats.std_dev > nationalStats.std_dev * 1.2) {
             insights.push({
                 type: 'info',
-                text: 'Higher variability than national - consider targeted interventions'
+                text: 'Higher variability than global benchmark - consider targeted interventions'
             });
         } else if (schoolStats.std_dev < nationalStats.std_dev * 0.8) {
             insights.push({
                 type: 'success',
-                text: 'More consistent scores than national average'
+                text: 'More consistent scores than global benchmark'
             });
         }
 
@@ -2653,12 +2653,12 @@ function initializeDashboardApp() {
         if (schoolStats.mean > nationalStats.percentile_75) {
             insights.push({
                 type: 'success',
-                text: 'Performance in top quartile nationally'
+                text: 'Performance in top quartile globally'
             });
         } else if (schoolStats.mean < nationalStats.percentile_25) {
             insights.push({
                 type: 'warning',
-                text: 'Performance in bottom quartile nationally'
+                text: 'Performance in bottom quartile globally'
             });
         }
 
@@ -3091,7 +3091,7 @@ function initializeDashboardApp() {
         // Add national distribution pattern as a line if data is available
         if (nationalPatternData) {
             datasets.push({
-                label: 'National Pattern',
+                label: 'Global Pattern',
                 data: nationalPatternData,
                 type: 'line',
                 borderColor: 'rgba(255, 217, 61, 0.5)', // More subtle golden yellow
@@ -3139,8 +3139,8 @@ function initializeDashboardApp() {
                                 const defaultLabels = Chart.defaults.plugins.legend.labels.generateLabels(chart);
                                 // Customize the national pattern label
                                 defaultLabels.forEach(label => {
-                                    if (label.text === 'National Pattern') {
-                                        label.text = 'National Pattern (scaled for comparison)';
+                                                                    if (label.text === 'Global Pattern') {
+                                    label.text = 'Global Pattern (scaled for comparison)';
                                     }
                                 });
                                 return defaultLabels;
@@ -3162,11 +3162,11 @@ function initializeDashboardApp() {
                                 const value = context.raw;
                                 if (datasetLabel === 'School Score Distribution') {
                                     return `Your School: ${value} students`;
-                                } else if (datasetLabel === 'National Pattern') {
+                                } else if (datasetLabel === 'Global Pattern') {
                                     // For national pattern, show it as a relative indicator
                                     const scoreIndex = parseInt(context.label);
                                     const nationalValue = nationalDistributionData ? nationalDistributionData[scoreIndex] : 0;
-                                    return `National Pattern (${nationalValue.toLocaleString()} students nationally)`;
+                                    return `Global Pattern (${nationalValue.toLocaleString()} students globally)`;
                                 }
                                 return `${datasetLabel}: ${value}`;
                             }
@@ -3229,7 +3229,7 @@ function initializeDashboardApp() {
                 borderDash: [8, 4], // Dashed line
                 label: {
                     enabled: true,
-                    content: `Nat Avg: ${nationalAverageScore.toFixed(1)}`,
+                    content: `Global Avg: ${nationalAverageScore.toFixed(1)}`,
                     position: 'start',
                     backgroundColor: 'rgba(255, 217, 61, 0.9)',
                     font: { 
@@ -3242,7 +3242,7 @@ function initializeDashboardApp() {
             };
         } else if (nationalAverageScore !== null && typeof nationalAverageScore !== 'undefined') {
             // Fallback: add to title if annotation plugin is not available
-            chartConfig.options.plugins.title.text += ` (Nat Avg: ${nationalAverageScore.toFixed(2)})`;
+            chartConfig.options.plugins.title.text += ` (Global Avg: ${nationalAverageScore.toFixed(2)})`;
         }
 
         log(`Creating histogram for ${canvasId} with title: '${chartConfig.options.plugins.title.text}'`); // Log final title
@@ -3589,9 +3589,12 @@ function initializeDashboardApp() {
                 labels: ['1', '2', '3', '4', '5'],
                 datasets: [{
                     data: distribution,
-                    backgroundColor: color + '80', // 50% opacity
+                    backgroundColor: color + 'CC', // Higher opacity (80%)
                     borderColor: color,
-                    borderWidth: 1
+                    borderWidth: 1.5,
+                    borderRadius: 3,
+                    barPercentage: 0.8,
+                    categoryPercentage: 0.9
                 }]
             },
             options: {
@@ -3603,15 +3606,38 @@ function initializeDashboardApp() {
                     },
                     tooltip: {
                         enabled: false
+                    },
+                    datalabels: {
+                        display: false
                     }
                 },
                 scales: {
                     y: {
                         display: false,
-                        beginAtZero: true
+                        beginAtZero: true,
+                        grid: {
+                            display: false
+                        }
                     },
                     x: {
-                        display: false
+                        display: true, // Show x-axis labels for better clarity
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            color: 'rgba(255, 255, 255, 0.5)',
+                            font: {
+                                size: 9
+                            }
+                        }
+                    }
+                },
+                layout: {
+                    padding: {
+                        top: 5,
+                        bottom: 0,
+                        left: 2,
+                        right: 2
                     }
                 }
             }
@@ -3869,7 +3895,7 @@ function initializeDashboardApp() {
                     errorLog("Error registering Annotation plugin globally: ", e)
                 }
             } else {
-                log("Annotation plugin not found globally (checked Annotation, Chart.Annotation, window.ChartAnnotation) during init. National average lines on histograms may not appear.");
+                log("Annotation plugin not found globally (checked Annotation, Chart.Annotation, window.ChartAnnotation) during init. Global benchmark lines on histograms may not appear.");
             }
             
             // Register Gauge chart controller if available
