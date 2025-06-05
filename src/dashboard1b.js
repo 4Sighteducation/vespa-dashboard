@@ -3263,18 +3263,203 @@ function initializeDashboardApp() {
         const top5 = sortedQuestions.slice(0, 5);
         const bottom5 = sortedQuestions.slice(-5).reverse(); // Reverse to show lowest score first if desired
 
-        const top5ul = document.getElementById('qla-top-5');
-        const bottom5ul = document.getElementById('qla-bottom-5');
-
-        if (top5ul) {
-            top5ul.innerHTML = top5.map(q => `<li>${q.text} (Avg: ${q.score})</li>`).join('');
-        }
-        if (bottom5ul) {
-            bottom5ul.innerHTML = bottom5.map(q => `<li>${q.text} (Avg: ${q.score})</li>`).join('');
-        }
-        log("Displayed Top/Bottom 5 questions.");
+        // Create enhanced card-based display
+        renderEnhancedQuestionCards(top5, bottom5, responses);
     }
-
+    
+    function renderEnhancedQuestionCards(topQuestions, bottomQuestions, allResponses) {
+        const container = document.getElementById('qla-top-bottom-questions');
+        if (!container) return;
+        
+        container.innerHTML = `
+            <div class="qla-top-bottom-container">
+                <div class="qla-questions-section top-questions">
+                    <h3><span class="icon">🏆</span> Top Performing Questions</h3>
+                    <div class="question-cards" id="top-question-cards">
+                        <div class="qla-loading">
+                            <div class="spinner"></div>
+                            <p>Loading question analysis...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="qla-questions-section bottom-questions">
+                    <h3><span class="icon">⚠️</span> Questions Needing Attention</h3>
+                    <div class="question-cards" id="bottom-question-cards">
+                        <div class="qla-loading">
+                            <div class="spinner"></div>
+                            <p>Loading question analysis...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Render cards with slight delay for animation
+        setTimeout(() => {
+            renderQuestionCards('top-question-cards', topQuestions, allResponses, 'top');
+            renderQuestionCards('bottom-question-cards', bottomQuestions, allResponses, 'bottom');
+        }, 100);
+    }
+    
+    function renderQuestionCards(containerId, questions, allResponses, type) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        questions.forEach((question, index) => {
+            const card = createQuestionCard(question, index + 1, allResponses, type);
+            container.appendChild(card);
+        });
+    }
+    
+    function createQuestionCard(question, rank, allResponses, type) {
+        const card = document.createElement('div');
+        card.className = 'question-card';
+        
+        // Determine color class based on score
+        let colorClass = '';
+        if (question.score >= 4) colorClass = 'excellent';
+        else if (question.score >= 3) colorClass = 'good';
+        else if (question.score >= 2) colorClass = 'average';
+        else colorClass = 'poor';
+        
+        card.classList.add(colorClass);
+        
+        // Calculate statistics for this question
+        const stats = calculateQuestionStatistics(question.id, allResponses);
+        
+        card.innerHTML = `
+            <div class="question-rank">${rank}</div>
+            <div class="question-text">${question.text}</div>
+            <div class="score-section">
+                <div class="score-indicator">${question.score.toFixed(2)}</div>
+                <div class="mini-chart-container">
+                    <canvas id="mini-chart-${question.id}"></canvas>
+                </div>
+            </div>
+            <div class="stats-details">
+                <div class="stat-item">
+                    <span class="stat-label">Responses</span>
+                    <span class="stat-value">${stats.count}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Std Dev</span>
+                    <span class="stat-value">${stats.stdDev.toFixed(2)}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Mode</span>
+                    <span class="stat-value">${stats.mode}</span>
+                </div>
+            </div>
+        `;
+        
+        // Add click handler for detailed analysis
+        card.addEventListener('click', () => {
+            showQuestionDetailModal(question, stats, allResponses);
+        });
+        
+        // Create mini chart after card is added to DOM
+        setTimeout(() => {
+            createMiniChart(`mini-chart-${question.id}`, stats.distribution, colorClass);
+        }, 100);
+        
+        return card;
+    }
+    
+    function calculateQuestionStatistics(questionId, allResponses) {
+        const scores = [];
+        const distribution = [0, 0, 0, 0, 0]; // For scores 1-5
+        
+        allResponses.forEach(response => {
+            const score = parseInt(response[questionId + '_raw']);
+            if (!isNaN(score) && score >= 1 && score <= 5) {
+                scores.push(score);
+                distribution[score - 1]++;
+            }
+        });
+        
+        // Calculate standard deviation
+        const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+        const variance = scores.reduce((sum, score) => sum + Math.pow(score - mean, 2), 0) / scores.length;
+        const stdDev = Math.sqrt(variance);
+        
+        // Find mode (most frequent score)
+        let maxCount = 0;
+        let mode = 0;
+        distribution.forEach((count, index) => {
+            if (count > maxCount) {
+                maxCount = count;
+                mode = index + 1;
+            }
+        });
+        
+        return {
+            count: scores.length,
+            stdDev: stdDev || 0,
+            mode: mode,
+            distribution: distribution,
+            scores: scores
+        };
+    }
+    
+    function createMiniChart(canvasId, distribution, colorClass) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        
+        // Color based on performance
+        const colors = {
+            excellent: '#10b981',
+            good: '#3b82f6',
+            average: '#f59e0b',
+            poor: '#ef4444'
+        };
+        
+        const color = colors[colorClass] || '#64748b';
+        
+        // Create a simple bar chart
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['1', '2', '3', '4', '5'],
+                datasets: [{
+                    data: distribution,
+                    backgroundColor: color + '80', // 50% opacity
+                    borderColor: color,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        enabled: false
+                    }
+                },
+                scales: {
+                    y: {
+                        display: false,
+                        beginAtZero: true
+                    },
+                    x: {
+                        display: false
+                    }
+                }
+            }
+        });
+    }
+    
+    function showQuestionDetailModal(question, stats, allResponses) {
+        // TODO: Implement detailed question analysis modal
+        log(`Showing detail modal for question: ${question.text}`);
+        // This will be implemented in Phase 2 with advanced statistics
+    }
 
     function displayQLAStats(responses) {
         // Calculate and display other stats:
