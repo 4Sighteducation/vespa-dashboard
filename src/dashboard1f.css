@@ -64,6 +64,13 @@ body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     line-height: 1.6;
     overflow-x: hidden;
+    max-width: 100vw; /* Ensure body doesn't exceed viewport */
+}
+
+/* Ensure html also prevents overflow */
+html {
+    overflow-x: hidden;
+    max-width: 100vw;
 }
 
 /* Override potential Knack container constraints */
@@ -94,12 +101,13 @@ body.knack-body .kn-content {
 /* --- Main Container --- */
 #dashboard-container {
     width: 100%;
-    max-width: none; /* Remove max-width constraint */
+    max-width: 100vw; /* Ensure it doesn't exceed viewport width */
     margin: 0;
     padding: 1rem;
     min-height: 100vh;
     background: linear-gradient(135deg, var(--primary-bg) 0%, var(--secondary-bg) 100%);
-    overflow-x: auto; /* Allow horizontal scroll if needed */
+    overflow-x: hidden; /* Prevent horizontal scroll on main container */
+    box-sizing: border-box; /* Include padding in width calculation */
 }
 
 /* Force full viewport usage */
@@ -765,6 +773,9 @@ body.knack-body .kn-content {
     padding: var(--spacing-md);
     margin-bottom: var(--spacing-md);
     box-shadow: var(--shadow-md);
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden; /* Prevent section overflow */
 }
 
 /* Ensure overview section handles overflow */
@@ -792,6 +803,8 @@ body.knack-body .kn-content {
     grid-template-columns: 2fr 2fr 1fr;
     gap: var(--spacing-md);
     margin-bottom: var(--spacing-lg);
+    width: 100%;
+    max-width: 100%;
 }
 
 @media (max-width: 768px) {
@@ -809,6 +822,10 @@ body.knack-body .kn-content {
     color: var(--text-primary);
     font-size: 1rem;
     transition: all 0.3s ease;
+    width: 100%;
+    min-width: 0; /* Prevent flex/grid items from overflowing */
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 #qla-question-dropdown:focus,
@@ -816,6 +833,14 @@ body.knack-body .kn-content {
     outline: none;
     border-color: var(--accent-primary);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* Ensure dropdown options don't overflow */
+#qla-question-dropdown option {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 #qla-chat-submit {
@@ -858,6 +883,9 @@ body.knack-body .kn-content {
     grid-template-columns: 1fr 1fr;
     gap: var(--spacing-lg);
     margin-top: var(--spacing-lg);
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 @media (max-width: 768px) {
@@ -908,10 +936,15 @@ body.knack-body .kn-content {
     flex-direction: column;
     gap: 2.5rem;
     margin-bottom: 2rem;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden; /* Prevent container overflow */
 }
 
 .qla-questions-section {
     width: 100%;
+    max-width: 100%;
+    overflow: hidden; /* Prevent section overflow */
 }
 
 .qla-questions-section h3 {
@@ -980,9 +1013,15 @@ body.knack-body .kn-content {
     display: flex;
     gap: 1rem;
     overflow-x: auto;
+    overflow-y: hidden;
     padding-bottom: 0.5rem;
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    width: 100%;
+    max-width: 100%;
+    /* Ensure the scrollable area is contained */
+    margin-left: 0;
+    margin-right: 0;
 }
 
 /* Custom scrollbar for question cards */
@@ -1062,14 +1101,15 @@ body.knack-body .kn-content {
 @media (max-width: 767px) {
     .question-cards {
         gap: 0.75rem;
-        margin-left: -1rem;
-        margin-right: -1rem;
-        padding-left: 1rem;
-        padding-right: 1rem;
+        /* Remove negative margins that cause overflow */
+        margin-left: 0;
+        margin-right: 0;
+        padding-left: 0;
+        padding-right: 0.5rem; /* Small padding for last card */
     }
     
     .question-card {
-        flex: 0 0 85vw; /* Card takes up most of viewport width */
+        flex: 0 0 calc(90vw - 2rem); /* Card width accounts for container padding */
         min-width: 240px;
         max-width: 320px;
     }
@@ -1422,6 +1462,12 @@ body.knack-body .kn-content {
 @media (max-width: 768px) {
     .qla-top-bottom-container {
         flex-direction: column;
+        padding: 0; /* Remove extra padding on mobile */
+    }
+    
+    .qla-questions-section {
+        width: 100%;
+        max-width: 100%;
     }
     
     .question-card {
@@ -1431,6 +1477,7 @@ body.knack-body .kn-content {
     .question-card .question-text {
         font-size: 0.9rem; /* Slightly larger on mobile */
         padding-right: 2.5rem;
+        word-wrap: break-word; /* Ensure long text wraps */
     }
     
     .score-indicator {
@@ -1443,6 +1490,17 @@ body.knack-body .kn-content {
     
     .question-card .stat-value {
         font-size: 0.9rem;
+    }
+    
+    /* Ensure QLA controls fit on mobile */
+    #qla-controls {
+        padding: 0;
+        width: 100%;
+    }
+    
+    #qla-question-dropdown,
+    #qla-chat-input {
+        font-size: 16px; /* Prevent iOS zoom on focus */
     }
 }
 
