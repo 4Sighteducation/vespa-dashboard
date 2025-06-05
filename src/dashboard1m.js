@@ -3289,40 +3289,42 @@ function initializeDashboardApp() {
                 // but some parts might still work if IDs are used.
             }
 
+// Fetch all records from Object_29 (Questionnaire Qs)
+// === Optimised QLA analysis: delegate heavy lifting to backend ===
+const filterPayload = {};
+if (establishmentId) filterPayload.establishmentId = establishmentId;
+if (staffAdminId)    filterPayload.staffAdminId    = staffAdminId;
 
-            // Fetch all records from Object_29 (Questionnaire Qs)
-            // Filter by Staff Admin ID or Establishment (VESPA Customer)
-            let qlaFilters = [];
-            
-            if (establishmentId) {
-                // Super User mode - filter by VESPA Customer (field_1821) which links to establishment
-                // Note: establishmentId is now a VESPA Customer ID from object_2
-                qlaFilters.push({
-                    field: 'field_1821', 
-                    operator: 'is',
-                    value: establishmentId
-                });
-                allQuestionResponses = await fetchDataFromKnack(objectKeys.questionnaireResponses, qlaFilters);
-                log("Fetched QLA Responses (filtered by VESPA Customer):", allQuestionResponses ? allQuestionResponses.length : 0);
-            } else if (staffAdminId) {
-                // Normal mode - filter by Staff Admin
-                qlaFilters.push({
-                    field: 'field_2069', 
-                    operator: 'is', // For array connections, 'is' often works like 'contains this ID' in Knack.
-                    value: staffAdminId
-                });
-                allQuestionResponses = await fetchDataFromKnack(objectKeys.questionnaireResponses, qlaFilters);
-                log("Fetched QLA Responses (filtered by Staff Admin ID):", allQuestionResponses ? allQuestionResponses.length : 0);
-            } else { 
-                log("No Staff Admin ID or Establishment ID provided to loadQLAData. Cannot filter QLA data. Attempting to fetch all.");
-                allQuestionResponses = await fetchDataFromKnack(objectKeys.questionnaireResponses, []); // Fetch all if no filter
-            }
-            // log("QLA data loaded:", allQuestionResponses.length, "responses"); // Already logged above if filtered
+try {
+    const res = await fetch(`${config.herokuAppUrl}/api/qla-analysis`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            analysisType: 'topBottom',   // server returns Top 5 & Bottom 5
+            questionIds : [],            // empty = analyse every question
+            filters     : filterPayload
+        })
+    });
+    if (!res.ok) throw new Error(`QLA analysis failed (${res.status})`);
+    const analysisData = await res.json();
 
-            populateQLAQuestionDropdown();
-            displayTopBottomQuestions(allQuestionResponses);
-            displayQLAStats(allQuestionResponses);
+    // Convert { qid: avg } objects → array expected by renderer
+    const top    = Object.entries(analysisData.top    || {})
+                         .map(([id, score]) => ({ id, score }));
+    const bottom = Object.entries(analysisData.bottom || {})
+                         .map(([id, score]) => ({ id, score }));
 
+    populateQLAQuestionDropdown();
+    // pass empty [] because we didn’t download full response set
+    renderEnhancedQuestionCards(top, bottom, []);
+} catch (err) {
+    errorLog('Failed QLA analysis', err);
+    const qlaSection = document.getElementById('qla-section');
+    if (qlaSection) {
+        qlaSection.innerHTML =
+            '<p>Error loading Question Level Analysis data. Please check console.</p>';
+    }
+}
         } catch (error) {
             errorLog("Failed to load QLA data", error);
             const qlaSection = document.getElementById('qla-section');
