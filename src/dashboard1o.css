@@ -803,89 +803,178 @@ body.knack-body .kn-content {
     overflow: visible; /* Allow child elements to manage their own overflow */
 }
 
+/* Remove old QLA controls styles */
 #qla-controls {
-    display: grid;
-    grid-template-columns: 2fr 2fr 1fr;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-xl);
-    width: 100%;
-    max-width: 100%;
+    display: none;
 }
 
-@media (max-width: 768px) {
-    #qla-controls {
-        grid-template-columns: 1fr;
+/* --- QLA Insights Grid --- */
+.qla-insights-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+    width: 100%;
+}
+
+@media (min-width: 768px) {
+    .qla-insights-grid {
+        grid-template-columns: repeat(3, 1fr);
     }
 }
 
-#qla-question-dropdown,
-#qla-chat-input {
-    padding: 0.875rem var(--spacing-md);
-    border: 2px solid var(--border-color);
-    border-radius: var(--radius-md);
-    background: var(--secondary-bg);
-    color: var(--text-primary);
-    font-size: 1rem;
-    transition: all 0.3s ease;
-    width: 100%;
-    min-width: 0; /* Prevent flex/grid items from overflowing */
+@media (min-width: 1200px) {
+    .qla-insights-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+.insight-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    position: relative;
     overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-#qla-question-dropdown:focus,
-#qla-chat-input:focus {
-    outline: none;
-    border-color: var(--accent-primary);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-}
-
-/* Ensure dropdown options don't overflow */
-#qla-question-dropdown option {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-#qla-chat-submit {
-    padding: 0.875rem var(--spacing-lg);
-    background: linear-gradient(135deg, var(--accent-primary), var(--accent-success));
-    color: white;
-    border: none;
-    border-radius: var(--radius-md);
-    font-size: 1rem;
-    font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    min-height: 200px;
 }
 
-#qla-chat-submit:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+.insight-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: currentColor;
+    transition: height 0.3s ease;
 }
 
-#qla-chat-submit:active {
-    transform: translateY(0);
+.insight-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    border-color: currentColor;
 }
 
-#qla-ai-response {
-    margin-top: var(--spacing-md);
-    padding: var(--spacing-md);
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(16, 185, 129, 0.1));
-    border-left: 4px solid var(--accent-primary);
-    border-radius: var(--radius-md);
-    min-height: 80px;
-    color: var(--text-secondary);
+.insight-card:hover::before {
+    height: 100%;
+    opacity: 0.1;
+}
+
+.insight-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    filter: grayscale(0);
+}
+
+.insight-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+.insight-content h4 {
     font-size: 1rem;
-    line-height: 1.8;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
 }
 
+.insight-percentage {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+    transition: transform 0.3s ease;
+}
+
+.insight-card:hover .insight-percentage {
+    transform: scale(1.1);
+}
+
+.insight-question {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    margin-bottom: 0.5rem;
+}
+
+.insight-sample {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: auto;
+}
+
+.insight-indicator {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    transition: height 0.3s ease;
+}
+
+.insight-card:hover .insight-indicator {
+    height: 6px;
+}
+
+/* Color coding for insights */
+.insight-card.excellent {
+    color: #10b981;
+}
+
+.insight-card.excellent .insight-indicator {
+    background: #10b981;
+}
+
+.insight-card.good {
+    color: #3b82f6;
+}
+
+.insight-card.good .insight-indicator {
+    background: #3b82f6;
+}
+
+.insight-card.average {
+    color: #f59e0b;
+}
+
+.insight-card.average .insight-indicator {
+    background: #f59e0b;
+}
+
+.insight-card.poor {
+    color: #ef4444;
+}
+
+.insight-card.poor .insight-indicator {
+    background: #ef4444;
+}
+
+/* Loading state for insights */
+.qla-insights-grid .qla-loading {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    color: var(--text-secondary);
+}
+
+/* --- QLA Top/Bottom Questions --- */
 #qla-top-bottom-questions {
     display: flex;
-    flex-direction: column; /* Stack vertically for full width */
+    flex-direction: column;
     gap: var(--spacing-xl);
     margin-top: var(--spacing-lg);
     width: 100%;
@@ -947,7 +1036,7 @@ body.knack-body .kn-content {
 
 .qla-info-btn {
     position: absolute;
-    right: 0;
+    right: var(--spacing-lg);
     top: 50%;
     transform: translateY(-50%);
     width: 32px;
@@ -1001,13 +1090,12 @@ body.knack-body .kn-content {
     overflow-y: hidden;
     padding: 1rem 0.5rem;
     scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    -webkit-overflow-scrolling: touch;
     width: 100%;
-    margin: 0 -0.5rem; /* Negative margin to extend to edges */
+    margin: 0 -0.5rem;
     position: relative;
 }
 
-/* Scroll hint gradient */
 .question-cards::after {
     content: '';
     position: absolute;
@@ -1025,7 +1113,6 @@ body.knack-body .kn-content {
     opacity: 1;
 }
 
-/* Custom scrollbar for question cards */
 .question-cards::-webkit-scrollbar {
     height: 6px;
 }
@@ -1045,10 +1132,10 @@ body.knack-body .kn-content {
 }
 
 .question-card {
-    flex: 0 0 320px; /* Slightly wider cards */
+    flex: 0 0 320px;
     min-width: 300px;
     max-width: 400px;
-    background: var(--secondary-bg); /* Different bg from section */
+    background: var(--secondary-bg);
     border-radius: 12px;
     padding: 1.5rem;
     cursor: pointer;
@@ -1057,56 +1144,6 @@ body.knack-body .kn-content {
     position: relative;
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-/* For larger screens, make cards bigger */
-@media (min-width: 1600px) {
-    .question-card {
-        flex: 0 0 320px;
-        min-width: 300px;
-        padding: 1.5rem;
-    }
-}
-
-@media (min-width: 1920px) {
-    .question-card {
-        flex: 0 0 360px;
-        min-width: 340px;
-    }
-}
-
-/* For screens that can fit multiple cards */
-@media (min-width: 1200px) {
-    .question-cards {
-        justify-content: flex-start; /* Keep cards left-aligned */
-        padding: 1rem;
-    }
-}
-
-/* For medium screens, show 2-3 cards */
-@media (max-width: 1199px) and (min-width: 768px) {
-    .question-card {
-        flex: 0 0 calc(50% - 0.5rem);
-        min-width: 280px;
-    }
-    
-    .question-cards {
-        flex-wrap: nowrap; /* Keep horizontal scroll */
-    }
-}
-
-/* For small screens, ensure cards are visible */
-@media (max-width: 767px) {
-    .question-cards {
-        gap: 0.75rem;
-        margin: 0;
-        padding: 0.5rem 0;
-    }
-    
-    .question-card {
-        flex: 0 0 calc(85vw - 2rem); /* Card width accounts for container padding */
-        min-width: 240px;
-    }
 }
 
 .question-card::before {
@@ -1152,29 +1189,7 @@ body.knack-body .kn-content {
     margin-bottom: 1rem;
     padding-right: 3rem;
     line-height: 1.5;
-    min-height: 3em; /* Ensure consistent height */
-}
-
-/* Scale text for larger screens */
-@media (min-width: 1600px) {
-    .question-card .question-text {
-        font-size: 1.05rem;
-        line-height: 1.6;
-    }
-    
-    .score-indicator {
-        font-size: 2.2rem;
-    }
-}
-
-@media (min-width: 1920px) {
-    .question-card .question-text {
-        font-size: 1.1rem;
-    }
-    
-    .score-indicator {
-        font-size: 2.5rem;
-    }
+    min-height: 3em;
 }
 
 .question-card .score-section {
@@ -1182,7 +1197,7 @@ body.knack-body .kn-content {
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    margin-bottom: 0.75rem; /* Add space before stats */
+    margin-bottom: 0.75rem;
 }
 
 .score-indicator {
@@ -1200,23 +1215,6 @@ body.knack-body .kn-content {
     background: rgba(255, 255, 255, 0.03);
     border-radius: 6px;
     padding: 4px;
-}
-
-/* Scale up mini charts on larger screens */
-@media (min-width: 1600px) {
-    .mini-chart-container {
-        height: 70px;
-        min-height: 70px;
-        max-width: 140px;
-    }
-}
-
-@media (min-width: 1920px) {
-    .mini-chart-container {
-        height: 80px;
-        min-height: 80px;
-        max-width: 160px;
-    }
 }
 
 .mini-chart-container canvas {
@@ -1239,7 +1237,7 @@ body.knack-body .kn-content {
     display: flex;
     flex-direction: column;
     align-items: center;
-    flex: 1; /* Equal width distribution */
+    flex: 1;
 }
 
 .question-card .stat-label {
@@ -1253,18 +1251,7 @@ body.knack-body .kn-content {
 .question-card .stat-value {
     font-weight: 600;
     color: var(--text-secondary);
-    font-size: 0.95rem; /* Larger for better readability */
-}
-
-/* Scale stats for larger screens */
-@media (min-width: 1600px) {
-    .question-card .stat-label {
-        font-size: 0.75rem;
-    }
-    
-    .question-card .stat-value {
-        font-size: 1.05rem;
-    }
+    font-size: 0.95rem;
 }
 
 /* Color coding for score ranges */
@@ -1282,52 +1269,6 @@ body.knack-body .kn-content {
 
 .question-card.poor {
     color: #ef4444;
-}
-
-/* QLA Question Categories */
-.qla-question-categories {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    margin: 2rem 0;
-    padding: 1.5rem;
-    background: rgba(255, 255, 255, 0.02);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border-color);
-}
-
-.category-card {
-    background: var(--card-bg);
-    border-radius: var(--radius-md);
-    padding: 1rem;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    border: 1px solid var(--border-color);
-}
-
-.category-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    border-color: var(--accent-primary);
-}
-
-.category-card .icon {
-    font-size: 2rem;
-    margin-bottom: 0.5rem;
-    display: block;
-}
-
-.category-card h4 {
-    font-size: 1rem;
-    color: var(--text-primary);
-    margin-bottom: 0.25rem;
-}
-
-.category-card p {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    margin: 0;
 }
 
 /* Loading state for QLA */
@@ -1454,6 +1395,20 @@ body.knack-body .kn-content {
 
 /* Responsive adjustments for QLA */
 @media (max-width: 768px) {
+    .qla-insights-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+    
+    .insight-card {
+        padding: 1.25rem;
+        min-height: 180px;
+    }
+    
+    .insight-percentage {
+        font-size: 2rem;
+    }
+    
     .qla-top-bottom-container {
         gap: 1.5rem;
     }
@@ -1462,51 +1417,40 @@ body.knack-body .kn-content {
         padding: var(--spacing-md);
         margin-bottom: var(--spacing-sm);
     }
-    
+
     .qla-questions-section h3 {
         font-size: 1.2rem;
         margin: calc(-1 * var(--spacing-md)) calc(-1 * var(--spacing-md)) var(--spacing-sm) calc(-1 * var(--spacing-md));
         padding: var(--spacing-sm) var(--spacing-md);
     }
-    
+
     .question-cards {
         margin: 0;
         padding: 0.5rem 0;
     }
-    
+
     .question-card {
         flex: 0 0 280px;
         min-width: 260px;
         padding: 1.25rem;
     }
-    
+
     .question-card .question-text {
         font-size: 0.9rem;
         padding-right: 2.5rem;
         word-wrap: break-word;
     }
-    
+
     .score-indicator {
         font-size: 1.8rem;
     }
-    
+
     .question-card .stats-details {
         gap: 1rem;
     }
     
     .question-card .stat-value {
         font-size: 0.9rem;
-    }
-    
-    /* Ensure QLA controls fit on mobile */
-    #qla-controls {
-        padding: 0;
-        width: 100%;
-    }
-    
-    #qla-question-dropdown,
-    #qla-chat-input {
-        font-size: 16px; /* Prevent iOS zoom on focus */
     }
 }
 
@@ -1518,17 +1462,153 @@ body.knack-body .kn-content {
     border-radius: var(--radius-lg);
     padding: var(--spacing-lg);
     margin-top: var(--spacing-md);
-    min-height: 200px;
+    min-height: 300px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    position: relative;
 }
 
-#word-cloud-container p,
-#common-themes-container p {
+/* Word Cloud Specific Styles */
+#word-cloud-container {
+    min-height: 400px;
+}
+
+#word-cloud-canvas {
+    width: 100%;
+    height: 350px;
+    cursor: pointer;
+}
+
+.word-list {
+    width: 100%;
+    text-align: center;
+}
+
+.word-list h4 {
+    font-size: 1.2rem;
+    color: var(--text-primary);
+    margin-bottom: 1.5rem;
+}
+
+.word-list .words {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: center;
+    align-items: center;
+}
+
+.word-item {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: var(--card-bg);
+    border-radius: 20px;
+    color: var(--text-primary);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    border: 1px solid var(--border-color);
+}
+
+.word-item:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    border-color: var(--accent-primary);
+}
+
+.word-cloud-stats {
+    position: absolute;
+    bottom: 1rem;
+    right: 1rem;
+    display: flex;
+    gap: 2rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    background: rgba(0, 0, 0, 0.5);
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-sm);
+}
+
+/* Themes Grid */
+.themes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    width: 100%;
+    margin-top: 1rem;
+}
+
+.theme-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.theme-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.theme-card h4 {
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.theme-count {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+}
+
+.theme-examples {
+    font-size: 0.85rem;
     color: var(--text-muted);
     font-style: italic;
-    font-size: 1rem;
+}
+
+.theme-examples p {
+    margin-bottom: 0.5rem;
+    padding-left: 1rem;
+    border-left: 2px solid var(--border-color);
+}
+
+/* Sentiment-based theme colors */
+.theme-card.positive {
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+.theme-card.positive:hover {
+    border-color: var(--accent-success);
+}
+
+.theme-card.negative {
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.theme-card.negative:hover {
+    border-color: var(--accent-danger);
+}
+
+.theme-card.mixed {
+    border-color: rgba(245, 158, 11, 0.3);
+}
+
+.theme-card.mixed:hover {
+    border-color: var(--accent-warning);
+}
+
+/* Common themes container specific */
+#common-themes-container h3 {
+    font-size: 1.3rem;
+    color: var(--text-primary);
+    margin-bottom: 1.5rem;
+    width: 100%;
+    text-align: left;
 }
 
 /* --- Animations --- */

@@ -163,6 +163,26 @@ function initializeDashboardApp() {
     // These will typically use your Heroku app as a proxy to securely call the Knack API.
     // Example:
     async function fetchDataFromKnack(objectKey, filters = [], options = {}) {
+        // Fast-path: if the request is for VESPA results and we already have them cached from
+        // the /dashboard-initial-data batch call, return the cached set (optionally filtered)
+        // instead of making a round-trip to the backend.
+
+        if (objectKey === (objectKeys?.vespaResults || 'object_10')) {
+            const cached = DataCache.get('vespaResults');
+            if (cached && Array.isArray(cached)) {
+                // If no server-side filters requested just return the whole set
+                if (!filters || filters.length === 0) {
+                    log('fetchDataFromKnack: served VESPA results from cache', { count: cached.length });
+                    return cached;
+                }
+
+                // Apply simple filter logic locally so we still respect the caller's intent.
+                const filtered = applyFiltersToRecords(cached, filters);
+                log('fetchDataFromKnack: served filtered VESPA results from cache', { requestedFilters: filters, count: filtered.length });
+                return filtered;
+            }
+        }
+
         let url = `${config.herokuAppUrl}/api/knack-data?objectKey=${objectKey}&filters=${encodeURIComponent(JSON.stringify(filters))}`;
         
         // Append options to URL if they exist
@@ -723,20 +743,11 @@ function initializeDashboardApp() {
                 </section>
                 <section id="qla-section" style="${showSuperUserControls ? 'display: none;' : ''}">
                     <h2>Question Level Analysis</h2>
-                    <div id="qla-controls">
-                        <select id="qla-question-dropdown"></select>
-                        <input type="text" id="qla-chat-input" placeholder="Ask about the question data...">
-                        <button id="qla-chat-submit">Ask AI</button>
+                    <div id="qla-insights-grid" class="qla-insights-grid">
+                        <!-- Pre-calculated insights will be rendered here -->
                     </div>
-                    <div id="qla-ai-response"></div>
                     <div id="qla-top-bottom-questions">
-                        <h3>Top 5 Questions</h3>
-                        <ul id="qla-top-5"></ul>
-                        <h3>Bottom 5 Questions</h3>
-                        <ul id="qla-bottom-5"></ul>
-                    </div>
-                    <div id="qla-stats">
-                        <!-- Other interesting statistical info -->
+                        <!-- Top and bottom questions will be rendered here -->
                     </div>
                 </section>
                 <section id="student-insights-section" style="${showSuperUserControls ? 'display: none;' : ''}">
@@ -748,7 +759,6 @@ function initializeDashboardApp() {
         `;
         
         // Add event listeners for UI elements
-        document.getElementById('qla-chat-submit')?.addEventListener('click', handleQLAChatSubmit);
         
         // Add filter toggle functionality
         const filterToggleBtn = document.getElementById('filter-toggle-btn');
@@ -3285,46 +3295,46 @@ function initializeDashboardApp() {
                 log("Question mappings loaded:", questionMappings);
             } catch (mapError) {
                 errorLog("Failed to load question mappings", mapError);
-                // Proceeding without mappings might make QLA less user-friendly
-                // but some parts might still work if IDs are used.
             }
 
-// Fetch all records from Object_29 (Questionnaire Qs)
-// === Optimised QLA analysis: delegate heavy lifting to backend ===
-const filterPayload = {};
-if (establishmentId) filterPayload.establishmentId = establishmentId;
-if (staffAdminId)    filterPayload.staffAdminId    = staffAdminId;
+            // Fetch pre-calculated insights
+            const filterPayload = {};
+            if (establishmentId) filterPayload.establishmentId = establishmentId;
+            if (staffAdminId) filterPayload.staffAdminId = staffAdminId;
 
-try {
-    const res = await fetch(`${config.herokuAppUrl}/api/qla-analysis`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            analysisType: 'topBottom',   // server returns Top 5 & Bottom 5
-            questionIds : [],            // empty = analyse every question
-            filters     : filterPayload
-        })
-    });
-    if (!res.ok) throw new Error(`QLA analysis failed (${res.status})`);
-    const analysisData = await res.json();
+            try {
+                // Get top/bottom questions
+                const res = await fetch(`${config.herokuAppUrl}/api/qla-analysis`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        analysisType: 'topBottom',
+                        questionIds: [],
+                        filters: filterPayload
+                    })
+                });
+                if (!res.ok) throw new Error(`QLA analysis failed (${res.status})`);
+                const analysisData = await res.json();
 
-    // Convert { qid: avg } objects → array expected by renderer
-    const top    = Object.entries(analysisData.top    || {})
-                         .map(([id, score]) => ({ id, score }));
-    const bottom = Object.entries(analysisData.bottom || {})
-                         .map(([id, score]) => ({ id, score }));
+                // Convert to array format
+                const top = Object.entries(analysisData.top || {})
+                    .map(([id, score]) => ({ id, score }));
+                const bottom = Object.entries(analysisData.bottom || {})
+                    .map(([id, score]) => ({ id, score }));
 
-    populateQLAQuestionDropdown();
-    // pass empty [] because we didn’t download full response set
-    renderEnhancedQuestionCards(top, bottom, []);
-} catch (err) {
-    errorLog('Failed QLA analysis', err);
-    const qlaSection = document.getElementById('qla-section');
-    if (qlaSection) {
-        qlaSection.innerHTML =
-            '<p>Error loading Question Level Analysis data. Please check console.</p>';
-    }
-}
+                // Render the enhanced cards
+                renderEnhancedQuestionCards(top, bottom, []);
+                
+                // Load pre-calculated insights
+                await loadPreCalculatedInsights(filterPayload);
+                
+            } catch (err) {
+                errorLog('Failed QLA analysis', err);
+                const qlaSection = document.getElementById('qla-section');
+                if (qlaSection) {
+                    qlaSection.innerHTML = '<p>Error loading Question Level Analysis data. Please check console.</p>';
+                }
+            }
         } catch (error) {
             errorLog("Failed to load QLA data", error);
             const qlaSection = document.getElementById('qla-section');
@@ -3332,39 +3342,187 @@ try {
         }
     }
 
-
-    async function populateQLAQuestionDropdown() {
-        const dropdown = document.getElementById('qla-question-dropdown');
-        if (!dropdown) return;
-
-        try {
-            const response = await fetch(`${config.herokuAppUrl}/api/interrogation-questions`); 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || 'Failed to fetch interrogation questions');
+    // New function to load pre-calculated insights
+    async function loadPreCalculatedInsights(filters) {
+        const insightsContainer = document.getElementById('qla-insights-grid');
+        if (!insightsContainer) return;
+        
+        // Show loading state
+        insightsContainer.innerHTML = `
+            <div class="qla-loading">
+                <div class="spinner"></div>
+                <p>Calculating insights...</p>
+            </div>
+        `;
+        
+        // Define the 10-12 useful pre-calculated questions
+        const insightQuestions = [
+            {
+                id: 'support_awareness',
+                title: 'Support Awareness',
+                question: 'What percentage of students know where to get support?',
+                type: 'percentAgree',
+                questionIds: ['q1'], // "I know where to get support if I need it"
+                icon: '🤝'
+            },
+            {
+                id: 'exam_preparedness',
+                title: 'Exam Readiness',
+                question: 'What percentage feel prepared for exams?',
+                type: 'percentAgree',
+                questionIds: ['q2'], // "I feel prepared for my exams"
+                icon: '📚'
+            },
+            {
+                id: 'achievement_confidence',
+                title: 'Achievement Confidence',
+                question: 'What percentage believe they will achieve their potential?',
+                type: 'percentAgree',
+                questionIds: ['q3'], // "I feel I will achieve my potential"
+                icon: '🎯'
+            },
+            {
+                id: 'stress_management',
+                title: 'Stress Levels',
+                question: 'What percentage can manage exam stress effectively?',
+                type: 'percentAgree',
+                questionIds: ['q4'], // "I can manage the stress of exams"
+                icon: '😌'
+            },
+            {
+                id: 'teacher_support',
+                title: 'Teacher Support',
+                question: 'What percentage feel supported by teachers?',
+                type: 'percentAgree',
+                questionIds: ['q5'], // "My teachers give me the support I need"
+                icon: '👩‍🏫'
+            },
+            {
+                id: 'revision_confidence',
+                title: 'Revision Skills',
+                question: 'What percentage know how to revise effectively?',
+                type: 'percentAgree',
+                questionIds: ['q6'], // "I know how to revise effectively"
+                icon: '📖'
+            },
+            {
+                id: 'goal_clarity',
+                title: 'Goal Clarity',
+                question: 'What percentage have clear goals?',
+                type: 'percentAgree',
+                questionIds: ['q7'], // "I have clear goals for my future"
+                icon: '🎯'
+            },
+            {
+                id: 'time_management',
+                title: 'Time Management',
+                question: 'What percentage manage their time well?',
+                type: 'percentAgree',
+                questionIds: ['q8'], // "I manage my time effectively"
+                icon: '⏰'
+            },
+            {
+                id: 'motivation_levels',
+                title: 'Motivation',
+                question: 'What percentage feel motivated to succeed?',
+                type: 'percentAgree',
+                questionIds: ['q9'], // "I feel motivated to succeed"
+                icon: '🚀'
+            },
+            {
+                id: 'wellbeing_support',
+                title: 'Wellbeing Support',
+                question: 'What percentage feel the school supports their wellbeing?',
+                type: 'percentAgree',
+                questionIds: ['q10'], // "The school supports my wellbeing"
+                icon: '💚'
+            },
+            {
+                id: 'parent_support',
+                title: 'Parent Support',
+                question: 'What percentage feel supported by parents/carers?',
+                type: 'percentAgree',
+                questionIds: ['q11'], // "My parents/carers support my learning"
+                icon: '👨‍👩‍👧'
+            },
+            {
+                id: 'overall_satisfaction',
+                title: 'Overall Satisfaction',
+                question: 'What percentage are satisfied with their education?',
+                type: 'percentAgree',
+                questionIds: ['q12'], // "I am satisfied with my education"
+                icon: '⭐'
             }
-            const questions = await response.json(); 
-            window.interrogationQuestions = questions;
-
-            dropdown.innerHTML = '<option value="">Select a question...</option>'; // Reset
-
-            // Use the question *id* as the option value so we can reliably look-up calc metadata later
-            questions.forEach(qObj => {
-                if (!qObj || !qObj.id) return;
-
-                const option = document.createElement('option');
-                option.value = qObj.id;               // reliable key
-                option.textContent = qObj.question;   // human-readable text
-                option.setAttribute('data-question-text', qObj.question);
-                dropdown.appendChild(option);
-            });
-            log("Populated QLA question dropdown.");
-        } catch (error) {
-            errorLog("Failed to populate QLA question dropdown", error);
-            dropdown.innerHTML = "<option>Error loading questions</option>";
-        }
+        ];
+        
+        // Fetch all insights in parallel
+        const insightPromises = insightQuestions.map(async (insight) => {
+            try {
+                const res = await fetch(`${config.herokuAppUrl}/api/qla-analysis`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        analysisType: insight.type,
+                        questionIds: insight.questionIds,
+                        filters: filters
+                    })
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    return { ...insight, data };
+                }
+            } catch (err) {
+                console.error(`Failed to fetch ${insight.id}:`, err);
+            }
+            return { ...insight, data: null };
+        });
+        
+        const insights = await Promise.all(insightPromises);
+        
+        // Render the insights grid
+        renderInsightsGrid(insights);
     }
     
+    // New function to render insights grid
+    function renderInsightsGrid(insights) {
+        const container = document.getElementById('qla-insights-grid');
+        if (!container) return;
+        
+        container.innerHTML = insights.map(insight => {
+            const hasData = insight.data && insight.data.percent !== undefined;
+            const percentage = hasData ? insight.data.percent : 0;
+            const sampleSize = hasData ? insight.data.n : 0;
+            
+            // Determine color based on percentage
+            let colorClass = 'poor';
+            if (percentage >= 80) colorClass = 'excellent';
+            else if (percentage >= 60) colorClass = 'good';
+            else if (percentage >= 40) colorClass = 'average';
+            
+            return `
+                <div class="insight-card ${colorClass}">
+                    <div class="insight-icon">${insight.icon}</div>
+                    <div class="insight-content">
+                        <h4>${insight.title}</h4>
+                        <div class="insight-percentage">${percentage.toFixed(1)}%</div>
+                        <p class="insight-question">${insight.question}</p>
+                        <div class="insight-sample">n = ${sampleSize}</div>
+                    </div>
+                    <div class="insight-indicator ${colorClass}"></div>
+                </div>
+            `;
+        }).join('');
+        
+        // Add click handlers for detailed view (future enhancement)
+        container.querySelectorAll('.insight-card').forEach((card, index) => {
+            card.addEventListener('click', () => {
+                // Future: Show detailed breakdown
+                log(`Clicked on insight: ${insights[index].title}`);
+            });
+        });
+    }
+
     function calculateAverageScoresForQuestions(responses) {
         const questionScores = {};
         const questionCounts = {};
@@ -3671,186 +3829,154 @@ try {
         // This will be implemented in Phase 2 with advanced statistics
     }
 
-    function displayQLAStats(responses) {
-        // Calculate and display other stats:
-        // - Overall response distribution for key questions
-        // - Percentage agreement/disagreement for certain statements
-        const statsContainer = document.getElementById('qla-stats');
-        if (statsContainer) {
-            statsContainer.innerHTML = "<p>Other QLA stats will go here.</p>";
-        }
-    }
 
-    function handleQLAChatSubmit() {
-        const inputElement = document.getElementById('qla-chat-input');
-        const dropdownElement = document.getElementById('qla-question-dropdown');
-        const responseContainer = document.getElementById('qla-ai-response');
-
-        if (!inputElement || !dropdownElement || !responseContainer) return;
-
-        let userQuery = inputElement.value.trim();
-
-        // Determine which question (if any) was selected in the dropdown
-        const selectedQuestionId = dropdownElement.value;
-        let matchedItem = null;
-
-        if (selectedQuestionId) {
-            matchedItem = window.interrogationQuestions?.find(q => q.id === selectedQuestionId);
-            if (!userQuery && matchedItem) {
-                userQuery = matchedItem.question; // use canonical wording
-            }
-        }
-
-        // Fallback: try to match typed text exactly (legacy behaviour)
-        if (!matchedItem && userQuery) {
-            matchedItem = window.interrogationQuestions?.find(q => q.question === userQuery);
-        }
-
-        if (!userQuery) {
-            responseContainer.textContent = "Please type a question or select one from the dropdown.";
-            return;
-        }
-
-        responseContainer.textContent = "Thinking...";
-
-        // If still not matched (e.g., user typed exact text), try a final lookup
-        if (!matchedItem) {
-            matchedItem = window.interrogationQuestions?.find(q => q.question === userQuery);
-        }
-
-        // If we have metadata and it's quick-tier, fetch the numeric answer first
-        const fetchNumericAnswer = async () => {
-            if (!matchedItem || matchedItem.calcLevel !== 'quick') return null;
-
-            const analysisBody = {
-                analysisType: matchedItem.calcType,
-                questionIds: matchedItem.questionIds,
-                filters: selectedEstablishmentId ? [{ field: 'field_1821', operator: 'is', value: selectedEstablishmentId }] : []
-            };
-
-            try {
-                const res = await fetch(`${config.herokuAppUrl}/api/qla-analysis`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(analysisBody)
-                });
-                if (res.ok) {
-                    return await res.json();
-                }
-            } catch (err) {
-                console.error('Numeric analysis fetch error', err);
-            }
-            return null;
-        };
-
-        fetchNumericAnswer().then(numericResult => {
-            // Build prompt for AI
-            let prompt = userQuery;
-            if (numericResult) {
-                prompt = `Here are the calculated figures: ${JSON.stringify(numericResult)}.\nUser Question: ${userQuery}`;
-            }
-
-            // Call chat endpoint
-            fetch(`${config.herokuAppUrl}/api/qla-chat`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query: prompt, questionData: [] })
-            })
-                .then(r => r.json())
-                .then(data => {
-                    responseContainer.textContent = data.answer || 'No response';
-                })
-                .catch(err => {
-                    console.error(err);
-                    responseContainer.textContent = 'AI request failed.';
-                });
-        });
-    }
 
 
     // --- Section 3: Student Comment Insights ---
     async function loadStudentCommentInsights(staffAdminId, establishmentId = null) {
         log(`Loading student comment insights with Staff Admin ID: ${staffAdminId}, Establishment ID: ${establishmentId}`);
         try {
-            let vespaResults = []; // Initialize as empty array
-            const filters = [];
-            
+            // Prepare filters for comment analysis
+            const filters = {};
             if (establishmentId) {
-                // Super User mode - filter by establishment
-                filters.push({
-                    field: 'field_133',
-                    operator: 'is',
-                    value: establishmentId
-                });
-                vespaResults = await fetchDataFromKnack(objectKeys.vespaResults, filters);
-                log("Fetched VESPA Results for comments (filtered by Establishment):", vespaResults ? vespaResults.length : 0);
+                filters.establishmentId = establishmentId;
             } else if (staffAdminId) {
-                // Normal mode - filter by staff admin
-                filters.push({
-                    field: 'field_439', 
-                    operator: 'is',
-                    value: staffAdminId
-                });
-                vespaResults = await fetchDataFromKnack(objectKeys.vespaResults, filters);
-                log("Fetched VESPA Results for comments (filtered by Staff Admin ID):", vespaResults ? vespaResults.length : 0);
-            } else {
-                 log("No Staff Admin ID or Establishment ID provided to loadStudentCommentInsights. Cannot filter comments.");
+                filters.staffAdminId = staffAdminId;
             }
             
-            if (!Array.isArray(vespaResults)) {
-                errorLog("loadStudentCommentInsights: vespaResults is not an array after fetch.", vespaResults);
-                vespaResults = []; // Ensure it's an array to prevent further errors
-            }
-
-            const allComments = [];
-            if (vespaResults.length > 0) { // Only proceed if we have results
-                vespaResults.forEach(record => {
-                    if (record.field_2302_raw) allComments.push(record.field_2302_raw); // RRC1
-                    if (record.field_2303_raw) allComments.push(record.field_2303_raw); // RRC2
-                    if (record.field_2304_raw) allComments.push(record.field_2304_raw); // RRC3
-                    if (record.field_2499_raw) allComments.push(record.field_2499_raw); // GOAL1
-                    if (record.field_2493_raw) allComments.push(record.field_2493_raw); // GOAL2
-                    if (record.field_2494_raw) allComments.push(record.field_2494_raw); // GOAL3
+            // Define comment fields to analyze
+            const commentFields = [
+                'field_2302', // RRC1
+                'field_2303', // RRC2
+                'field_2304', // RRC3
+                'field_2499', // GOAL1
+                'field_2493', // GOAL2
+                'field_2494'  // GOAL3
+            ];
+            
+            // Fetch word cloud data
+            try {
+                const wordCloudResponse = await fetch(`${config.herokuAppUrl}/api/comment-wordcloud`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        commentFields: commentFields,
+                        filters: filters
+                    })
                 });
+                
+                if (wordCloudResponse.ok) {
+                    const wordCloudData = await wordCloudResponse.json();
+                    renderWordCloud(wordCloudData);
+                }
+            } catch (error) {
+                errorLog("Failed to fetch word cloud data", error);
             }
-
-            log("Total comments extracted:", allComments.length);
-
-            // Render Word Cloud
-            renderWordCloud(allComments);
-
-            // Identify and Display Common Themes (this is more complex, might need NLP on Heroku)
-            identifyCommonThemes(allComments);
+            
+            // Fetch theme analysis
+            try {
+                const themesResponse = await fetch(`${config.herokuAppUrl}/api/comment-themes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        commentFields: commentFields,
+                        filters: filters
+                    })
+                });
+                
+                if (themesResponse.ok) {
+                    const themesData = await themesResponse.json();
+                    renderThemes(themesData);
+                }
+            } catch (error) {
+                errorLog("Failed to fetch themes data", error);
+            }
 
         } catch (error) {
             errorLog("Failed to load student comment insights", error);
         }
     }
 
-    function renderWordCloud(comments) {
+    function renderWordCloud(data) {
         const container = document.getElementById('word-cloud-container');
         if (!container) return;
-        log("Rendering word cloud.");
-        // Use a library like WordCloud.js (https://wordcloud2.js.org/) or similar.
-        // You'll need to process the text: concatenate, remove stop words, count frequencies.
-        // Example (conceptual):
-        // const textBlob = comments.join(" ");
-        // const wordFrequencies = calculateWordFrequencies(textBlob);
-        // WordCloud(container, { list: wordFrequencies });
-        container.innerHTML = "<p>Word cloud will go here.</p>";
-
+        
+        if (!data.wordCloudData || data.wordCloudData.length === 0) {
+            container.innerHTML = '<p>No comment data available for word cloud.</p>';
+            return;
+        }
+        
+        // Create canvas for word cloud
+        container.innerHTML = '<canvas id="word-cloud-canvas"></canvas>';
+        
+        // Check if WordCloud2 is available
+        if (typeof WordCloud !== 'undefined') {
+            const canvas = document.getElementById('word-cloud-canvas');
+            const words = data.wordCloudData.map(item => [item.text, item.size]);
+            
+            // Configure word cloud
+            WordCloud(canvas, {
+                list: words,
+                gridSize: 8,
+                weightFactor: 10,
+                fontFamily: 'Inter, sans-serif',
+                color: function() {
+                    // Use theme colors
+                    const colors = ['#ff8f00', '#86b4f0', '#72cb44', '#7f31a4', '#f032e6', '#ffd93d'];
+                    return colors[Math.floor(Math.random() * colors.length)];
+                },
+                rotateRatio: 0.5,
+                backgroundColor: 'transparent',
+                minSize: 12
+            });
+        } else {
+            // Fallback to simple word list
+            container.innerHTML = `
+                <div class="word-list">
+                    <h4>Most Common Words</h4>
+                    <div class="words">
+                        ${data.wordCloudData.slice(0, 20).map(item => 
+                            `<span class="word-item" style="font-size: ${Math.min(2, 0.8 + item.size/50)}rem">${item.text}</span>`
+                        ).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Add summary stats
+        if (data.totalComments) {
+            container.innerHTML += `
+                <div class="word-cloud-stats">
+                    <span>Total Comments: ${data.totalComments}</span>
+                    <span>Unique Words: ${data.uniqueWords}</span>
+                </div>
+            `;
+        }
     }
 
-    function identifyCommonThemes(comments) {
+    function renderThemes(data) {
         const container = document.getElementById('common-themes-container');
         if (!container) return;
-        log("Identifying common themes.");
-        // This is a more advanced NLP task.
-        // Simplistic: Count occurrences of keywords.
-        // Advanced: Use your Heroku backend + OpenAI to summarize themes.
-        // Example:
-        // Send comments to Heroku -> Heroku uses OpenAI to extract themes -> display themes.
-        container.innerHTML = "<p>Common themes will be listed here.</p>";
+        
+        if (!data.themes || data.themes.length === 0) {
+            container.innerHTML = '<p>Theme analysis will be available soon.</p>';
+            return;
+        }
+        
+        container.innerHTML = `
+            <h3>Common Themes</h3>
+            <div class="themes-grid">
+                ${data.themes.map(theme => `
+                    <div class="theme-card ${theme.sentiment}">
+                        <h4>${theme.theme}</h4>
+                        <div class="theme-count">${theme.count} mentions</div>
+                        <div class="theme-examples">
+                            ${theme.examples.map(ex => `<p>"${ex}"</p>`).join('')}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
     }
 
     // --- Initialization ---
