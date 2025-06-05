@@ -3901,65 +3901,93 @@ function initializeDashboardApp() {
         const container = document.getElementById('word-cloud-container');
         if (!container) return;
         
-        if (!data.wordCloudData || data.wordCloudData.length === 0) {
-            container.innerHTML = '<p>No comment data available for word cloud.</p>';
+        // Handle empty data or error messages
+        if (!data || !data.wordCloudData || data.wordCloudData.length === 0) {
+            const message = data?.message || 'No comment data available for word cloud.';
+            container.innerHTML = `<p class="no-data-message">${message}</p>`;
             return;
         }
         
         // Create canvas for word cloud
-        container.innerHTML = '<canvas id="word-cloud-canvas"></canvas>';
+        container.innerHTML = '<canvas id="word-cloud-canvas" width="800" height="400"></canvas>';
         
         // Check if WordCloud2 is available
         if (typeof WordCloud !== 'undefined') {
             const canvas = document.getElementById('word-cloud-canvas');
+            
+            // Ensure canvas has proper dimensions
+            const containerWidth = container.offsetWidth || 800;
+            const containerHeight = 400;
+            canvas.width = containerWidth;
+            canvas.height = containerHeight;
+            
             const words = data.wordCloudData.map(item => [item.text, item.size]);
             
-            // Configure word cloud
-            WordCloud(canvas, {
-                list: words,
-                gridSize: 8,
-                weightFactor: 10,
-                fontFamily: 'Inter, sans-serif',
-                color: function() {
-                    // Use theme colors
-                    const colors = ['#ff8f00', '#86b4f0', '#72cb44', '#7f31a4', '#f032e6', '#ffd93d'];
-                    return colors[Math.floor(Math.random() * colors.length)];
-                },
-                rotateRatio: 0.5,
-                backgroundColor: 'transparent',
-                minSize: 12
-            });
+            try {
+                // Configure word cloud
+                WordCloud(canvas, {
+                    list: words,
+                    gridSize: Math.round(16 * containerWidth / 1024),
+                    weightFactor: function(size) {
+                        return Math.pow(size, 1.5) * containerWidth / 1024;
+                    },
+                    fontFamily: 'Inter, sans-serif',
+                    color: function(word, weight) {
+                        // Use theme colors
+                        const colors = ['#ff8f00', '#86b4f0', '#72cb44', '#7f31a4', '#f032e6', '#ffd93d'];
+                        return colors[Math.floor(Math.random() * colors.length)];
+                    },
+                    rotateRatio: 0.5,
+                    rotationSteps: 2,
+                    backgroundColor: 'transparent',
+                    minSize: 12,
+                    drawOutOfBound: false,
+                    shrinkToFit: true
+                });
+            } catch (error) {
+                errorLog("WordCloud2 rendering error", error);
+                // Fallback to word list on error
+                renderWordListFallback(container, data);
+            }
         } else {
             // Fallback to simple word list
-            container.innerHTML = `
-                <div class="word-list">
-                    <h4>Most Common Words</h4>
-                    <div class="words">
-                        ${data.wordCloudData.slice(0, 20).map(item => 
-                            `<span class="word-item" style="font-size: ${Math.min(2, 0.8 + item.size/50)}rem">${item.text}</span>`
-                        ).join('')}
-                    </div>
-                </div>
-            `;
+            renderWordListFallback(container, data);
         }
         
         // Add summary stats
         if (data.totalComments) {
-            container.innerHTML += `
+            const statsHtml = `
                 <div class="word-cloud-stats">
                     <span>Total Comments: ${data.totalComments}</span>
                     <span>Unique Words: ${data.uniqueWords}</span>
+                    ${data.topWord ? `<span>Most Common: "${data.topWord[0]}" (${data.topWord[1]} times)</span>` : ''}
                 </div>
             `;
+            container.insertAdjacentHTML('beforeend', statsHtml);
         }
+    }
+    
+    function renderWordListFallback(container, data) {
+        container.innerHTML = `
+            <div class="word-list">
+                <h4>Most Common Words</h4>
+                <div class="words">
+                    ${data.wordCloudData.slice(0, 20).map(item => 
+                        `<span class="word-item" style="font-size: ${Math.min(2, 0.8 + item.size/50)}rem">${item.text}</span>`
+                    ).join('')}
+                </div>
+            </div>
+        `;
     }
 
     function renderThemes(data) {
         const container = document.getElementById('common-themes-container');
         if (!container) return;
         
-        if (!data.themes || data.themes.length === 0) {
-            container.innerHTML = '<p>Theme analysis will be available soon.</p>';
+        // Handle empty data or messages
+        if (!data || !data.themes || data.themes.length === 0) {
+            const message = data?.message || 'No themes available for analysis.';
+            container.innerHTML = `<p class="no-data-message">${message}</p>`;
             return;
         }
         
