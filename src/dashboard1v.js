@@ -63,6 +63,7 @@ const DataCache = {
     psychometricResponses: null,
     lastFetchTime: null,
     cacheTimeout: 5 * 60 * 1000, // 5 minutes
+    isLoading: false, // Add loading flag
     
     set(key, value) {
         this[key] = value;
@@ -83,11 +84,28 @@ const DataCache = {
         this.filterOptions = null;
         this.psychometricResponses = null;
         this.lastFetchTime = null;
+        this.isLoading = false;
+    },
+    
+    isValid() {
+        return this.lastFetchTime && (Date.now() - this.lastFetchTime) < this.cacheTimeout;
     }
 };
 
+// Add initialization guard
+let dashboardInitialized = false;
+let initializationInProgress = false;
+
 // Ensure this matches the initializerFunctionName in WorkingBridge.js
 function initializeDashboardApp() {
+    // Prevent duplicate initialization
+    if (dashboardInitialized || initializationInProgress) {
+        console.log("Dashboard already initialized or initialization in progress");
+        return;
+    }
+    
+    initializationInProgress = true;
+    
     // Update progress
     GlobalLoader.updateProgress(10, 'Checking configuration...');
     
@@ -230,6 +248,27 @@ function initializeDashboardApp() {
             return cachedData;
         }
         
+        // Check if already loading
+        if (DataCache.isLoading) {
+            log("Data fetch already in progress, waiting...");
+            // Wait for the current load to complete
+            let attempts = 0;
+            while (DataCache.isLoading && attempts < 50) { // Max 5 seconds wait
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+            // Check cache again after waiting
+            const newCachedData = DataCache.get('initialData');
+            if (newCachedData && newCachedData.cycle === cycle && 
+                newCachedData.staffAdminId === staffAdminId && 
+                newCachedData.establishmentId === establishmentId) {
+                log("Using cached data after waiting");
+                return newCachedData;
+            }
+        }
+        
+        DataCache.isLoading = true;
+        
         const url = `${config.herokuAppUrl}/api/dashboard-initial-data`;
         const requestData = {
             staffAdminId,
@@ -268,8 +307,10 @@ function initializeDashboardApp() {
             DataCache.set('filterOptions', data.filterOptions);
             DataCache.set('psychometricResponses', data.psychometricResponses);
             
+            DataCache.isLoading = false;
             return data;
         } catch (error) {
+            DataCache.isLoading = false;
             errorLog("Failed to fetch dashboard initial data", error);
             throw error;
         }
@@ -1905,9 +1946,21 @@ function initializeDashboardApp() {
         if (combinedContainer) combinedContainer.style.display = 'none'; // Hide while loading
 
         try {
-            // Use batch endpoint to fetch all data at once
-            GlobalLoader.updateProgress(40, 'Loading dashboard data...');
-            const batchData = await fetchDashboardInitialData(staffAdminId, establishmentId, cycle);
+            // Check if we need to fetch new data or can use cached
+            let batchData;
+            const cachedData = DataCache.get('initialData');
+            
+            // Only fetch new data if cache is invalid or cycle changed
+            if (!cachedData || cachedData.cycle !== cycle || 
+                cachedData.staffAdminId !== staffAdminId || 
+                cachedData.establishmentId !== establishmentId) {
+                GlobalLoader.updateProgress(40, 'Loading dashboard data...');
+                batchData = await fetchDashboardInitialData(staffAdminId, establishmentId, cycle);
+            } else {
+                log("Using cached data for overview");
+                batchData = cachedData;
+                GlobalLoader.updateProgress(50, 'Processing cached data...');
+            }
             
             let schoolVespaResults = batchData.vespaResults || [];
             let nationalBenchmarkRecord = batchData.nationalBenchmark;
@@ -4699,13 +4752,21 @@ function initializeDashboardApp() {
                 GlobalLoader.updateProgress(50, 'Setting up filters...');
                 populateFilterDropdownsFromCache(batchData.filterOptions);
                 
-                // Load all sections with cached data
+                // Load overview section first, then other sections
                 GlobalLoader.updateProgress(70, 'Rendering dashboard...');
-                await Promise.all([
-                    loadOverviewData(staffAdminRecordId, initialCycle),
-                    loadQLAData(staffAdminRecordId),
-                    loadStudentCommentInsights(staffAdminRecordId)
-                ]);
+                await loadOverviewData(staffAdminRecordId, initialCycle);
+                
+                // Load other sections in background after main dashboard is ready
+                setTimeout(async () => {
+                    try {
+                        await Promise.all([
+                            loadQLAData(staffAdminRecordId),
+                            loadStudentCommentInsights(staffAdminRecordId)
+                        ]);
+                    } catch (error) {
+                        errorLog("Error loading secondary sections", error);
+                    }
+                }, 100); // Small delay to ensure main UI is responsive
                 
                 GlobalLoader.updateProgress(90, 'Finalizing...');
                 
@@ -4713,15 +4774,17 @@ function initializeDashboardApp() {
                 GlobalLoader.updateProgress(100, 'Dashboard ready!');
                 setTimeout(() => GlobalLoader.hide(), 500);
                 
+                // Mark initialization as complete
+                dashboardInitialized = true;
+                initializationInProgress = false;
+                
                 // Add event listener for cycle selector
                 if (cycleSelectElement) {
                     cycleSelectElement.addEventListener('change', async (event) => {
                         const selectedCycle = parseInt(event.target.value, 10);
                         log(`Cycle changed to: ${selectedCycle}`);
                         
-                        // Clear cache to force refresh for new cycle
-                        DataCache.clear();
-                        
+                        // Don't clear entire cache, just invalidate cycle-specific data
                         const activeFilters = getActiveFilters();
                         await loadOverviewData(staffAdminRecordId, selectedCycle, activeFilters);
                     });
@@ -4730,19 +4793,27 @@ function initializeDashboardApp() {
             } catch (error) {
                 errorLog("Failed to initialize dashboard", error);
                 GlobalLoader.hide();
+                initializationInProgress = false;
                 document.getElementById('overview-section').innerHTML = `<p>Error loading dashboard: ${error.message}</p>`;
                 document.getElementById('qla-section').innerHTML = `<p>Error loading dashboard: ${error.message}</p>`;
                 document.getElementById('student-insights-section').innerHTML = `<p>Error loading dashboard: ${error.message}</p>`;
             }
             
-            // Add event listeners for filter buttons
+            // Add event listeners for filter buttons with debouncing
             const applyFiltersBtn = document.getElementById('apply-filters-btn');
             if (applyFiltersBtn) {
+                let filterTimeout;
                 applyFiltersBtn.addEventListener('click', () => {
-                    const selectedCycle = cycleSelectElement ? parseInt(cycleSelectElement.value, 10) : 1;
-                    const activeFilters = getActiveFilters();
-                    log("Applying filters:", activeFilters);
-                    loadOverviewData(staffAdminRecordId, selectedCycle, activeFilters);
+                    // Clear any pending filter applications
+                    if (filterTimeout) clearTimeout(filterTimeout);
+                    
+                    // Debounce filter application
+                    filterTimeout = setTimeout(() => {
+                        const selectedCycle = cycleSelectElement ? parseInt(cycleSelectElement.value, 10) : 1;
+                        const activeFilters = getActiveFilters();
+                        log("Applying filters:", activeFilters);
+                        loadOverviewData(staffAdminRecordId, selectedCycle, activeFilters);
+                    }, 300); // 300ms debounce
                 });
             }
             
