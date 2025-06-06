@@ -911,59 +911,46 @@ function initializeDashboardApp() {
             const cycleSelectElement = document.getElementById('cycle-select');
             const initialCycle = cycleSelectElement ? parseInt(cycleSelectElement.value, 10) : 1;
             
-            // Check if this is a large establishment first
-            const quickCheck = await fetch(`${config.herokuAppUrl}/api/dashboard-initial-data`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    establishmentId: establishmentId,
-                    cycle: initialCycle,
-                    rowsPerPage: 1  // Just check size
-                })
-            });
+            // Fetch the dashboard data with better error handling
+            GlobalLoader.updateProgress(30, 'Fetching dashboard data...');
             
-            if (quickCheck.ok) {
-                const checkData = await quickCheck.json();
-                const totalRecords = checkData.totalRecords || 0;
+            try {
+                const batchData = await fetchDashboardInitialData(null, establishmentId, initialCycle);
                 
-                if (totalRecords > 2000) {
-                    log(`Large establishment detected: ${totalRecords} records. Using paginated loading.`);
-                    GlobalLoader.updateProgress(20, `Large dataset detected (${totalRecords} records). Optimizing load...`);
-                    
-                    // For large establishments, load data in smaller chunks
-                    const batchData = await fetchDashboardInitialDataPaginated(null, establishmentId, initialCycle);
-                    
-                    // Populate filter dropdowns from cached data
-                    GlobalLoader.updateProgress(50, 'Setting up filters...');
-                    populateFilterDropdownsFromCache(batchData.filterOptions);
-                    
-                    // Load sections with limited data
-                    GlobalLoader.updateProgress(70, 'Rendering visualizations...');
-                    await Promise.all([
-                        loadOverviewData(null, initialCycle, [], establishmentId, true), // true = limited mode
-                        loadQLAData(null, establishmentId),
-                        loadStudentCommentInsights(null, establishmentId)
-                    ]);
+                // Check if we're in limited mode
+                if (batchData.isLimitedMode) {
+                    log(`Limited mode active: ${batchData.loadedRecords} of ${batchData.totalRecords} records loaded`);
+                    GlobalLoader.updateProgress(40, `Loading limited dataset (${batchData.loadedRecords} records)...`);
+                }
+                
+                // Populate filter dropdowns from cached data
+                GlobalLoader.updateProgress(50, 'Setting up filters...');
+                populateFilterDropdownsFromCache(batchData.filterOptions);
+                
+                // Load all sections with cached data
+                GlobalLoader.updateProgress(70, 'Rendering visualizations...');
+                
+                // Load sections sequentially to avoid overwhelming the browser
+                await loadOverviewData(null, initialCycle, [], establishmentId);
+                GlobalLoader.updateProgress(80, 'Loading question analysis...');
+                
+                await loadQLAData(null, establishmentId);
+                GlobalLoader.updateProgress(85, 'Loading student insights...');
+                
+                await loadStudentCommentInsights(null, establishmentId);
+                GlobalLoader.updateProgress(90, 'Finalizing...');
+                
+            } catch (fetchError) {
+                // If the initial fetch fails, show a more helpful error message
+                errorLog("Failed to fetch dashboard data", fetchError);
+                
+                // Check if it's a timeout error
+                if (fetchError.message.includes('timeout') || fetchError.message.includes('503')) {
+                    throw new Error(`The dataset for ${establishmentName} is too large to load quickly. Please try selecting a smaller establishment or contact support for assistance.`);
                 } else {
-                    // Normal flow for smaller establishments
-                    GlobalLoader.updateProgress(30, 'Fetching dashboard data...');
-                    const batchData = await fetchDashboardInitialData(null, establishmentId, initialCycle);
-                    
-                    // Populate filter dropdowns from cached data
-                    GlobalLoader.updateProgress(50, 'Setting up filters...');
-                    populateFilterDropdownsFromCache(batchData.filterOptions);
-                    
-                    // Load all sections with cached data
-                    GlobalLoader.updateProgress(70, 'Rendering visualizations...');
-                    await Promise.all([
-                        loadOverviewData(null, initialCycle, [], establishmentId),
-                        loadQLAData(null, establishmentId),
-                        loadStudentCommentInsights(null, establishmentId)
-                    ]);
+                    throw fetchError;
                 }
             }
-            
-            GlobalLoader.updateProgress(90, 'Finalizing...');
             
             // Update event listeners to use establishment filter
             if (cycleSelectElement) {
@@ -989,9 +976,22 @@ function initializeDashboardApp() {
         } catch (error) {
             errorLog("Failed to load establishment dashboard", error);
             GlobalLoader.hide();
-            document.getElementById('overview-section').innerHTML = `<p>Error loading dashboard for ${establishmentName}: ${error.message}</p>`;
-            document.getElementById('qla-section').innerHTML = `<p>Error loading dashboard for ${establishmentName}: ${error.message}</p>`;
-            document.getElementById('student-insights-section').innerHTML = `<p>Error loading dashboard for ${establishmentName}: ${error.message}</p>`;
+            
+            // Show user-friendly error messages
+            const errorMessage = error.message || 'An unexpected error occurred';
+            const errorHtml = `
+                <div style="padding: 2rem; text-align: center;">
+                    <h3 style="color: var(--accent-danger);">Unable to Load Dashboard</h3>
+                    <p style="margin: 1rem 0;">${errorMessage}</p>
+                    <button onclick="location.reload()" style="padding: 0.5rem 1rem; background: var(--accent-primary); color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        Refresh Page
+                    </button>
+                </div>
+            `;
+            
+            document.getElementById('overview-section').innerHTML = errorHtml;
+            document.getElementById('qla-section').innerHTML = '';
+            document.getElementById('student-insights-section').innerHTML = '';
         }
         
         // Update filter buttons
@@ -1031,49 +1031,6 @@ function initializeDashboardApp() {
                 log("Clearing all filters");
                 loadOverviewData(null, selectedCycle, [], establishmentId);
             });
-        }
-    }
-
-    // New paginated fetch function
-    async function fetchDashboardInitialDataPaginated(staffAdminId, establishmentId, cycle = 1) {
-        const url = `${config.herokuAppUrl}/api/dashboard-initial-data`;
-        const requestData = {
-            staffAdminId,
-            establishmentId,
-            cycle,
-            rowsPerPage: 1000,  // Fetch only first 1000 records
-            page: 1
-        };
-        
-        log("Fetching paginated dashboard initial data:", requestData);
-        
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestData)
-            });
-            
-            if (!response.ok) {
-                throw new Error(`Batch data request failed with status ${response.status}`);
-            }
-            
-            const data = await response.json();
-            
-            // Store that we're in limited mode
-            data.isLimitedMode = true;
-            data.totalAvailable = data.totalRecords || 0;
-            
-            // Cache the limited data
-            DataCache.set('initialData', data);
-            DataCache.set('vespaResults', data.vespaResults);
-            DataCache.set('nationalBenchmark', data.nationalBenchmark);
-            DataCache.set('filterOptions', data.filterOptions);
-            
-            return data;
-        } catch (error) {
-            errorLog("Failed to fetch paginated dashboard data", error);
-            throw error;
         }
     }
 
