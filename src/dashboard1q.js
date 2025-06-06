@@ -743,11 +743,11 @@ function initializeDashboardApp() {
                 </section>
                 <section id="qla-section" style="${showSuperUserControls ? 'display: none;' : ''}">
                     <h2>Question Level Analysis</h2>
-                    <div id="qla-insights-grid" class="qla-insights-grid">
-                        <!-- Pre-calculated insights will be rendered here -->
-                    </div>
                     <div id="qla-top-bottom-questions">
                         <!-- Top and bottom questions will be rendered here -->
+                    </div>
+                    <div id="qla-insights-grid" class="qla-insights-grid">
+                        <!-- Pre-calculated insights will be rendered here -->
                     </div>
                 </section>
                 <section id="student-insights-section" style="${showSuperUserControls ? 'display: none;' : ''}">
@@ -2910,6 +2910,292 @@ function initializeDashboardApp() {
         }
     };
 
+    // Insight Info Modal Functions
+    window.showInsightInfoModal = function(insightId) {
+        // Get the insight data
+        const insight = window.insightsData?.find(i => i.id === insightId);
+        if (!insight) return;
+        
+        // Define detailed explanations for each insight
+        const insightExplanations = {
+            'growth_mindset': {
+                title: 'Growth Mindset',
+                description: 'Measures students\' belief that intelligence and abilities can be developed through effort and learning.',
+                why: 'Students with a growth mindset are more likely to persist through challenges, embrace feedback, and achieve better academic outcomes.',
+                questions: [
+                    'Q5: "No matter who you are, you can change your intelligence a lot"',
+                    'Q26: "Your intelligence is something about you that you can change very much"'
+                ],
+                interpretation: {
+                    excellent: 'Most students believe they can improve their abilities - excellent foundation for learning',
+                    good: 'Good growth mindset culture, but room for improvement',
+                    average: 'Mixed beliefs about ability to improve - consider growth mindset interventions',
+                    poor: 'Fixed mindset prevalent - urgent need for growth mindset education'
+                }
+            },
+            'academic_momentum': {
+                title: 'Academic Momentum',
+                description: 'Captures students\' intrinsic drive, engagement with learning, and commitment to excellence.',
+                why: 'Students with high academic momentum are self-motivated and more likely to sustain performance through challenges.',
+                questions: [
+                    'Q14: "I strive to achieve the goals I set for myself"',
+                    'Q16: "I enjoy learning new things"',
+                    'Q17: "I\'m not happy unless my work is the best it can be"',
+                    'Q9: "I am a hard working student"'
+                ],
+                interpretation: {
+                    excellent: 'Students show strong drive and engagement - maintain this momentum',
+                    good: 'Good levels of motivation, but could be strengthened',
+                    average: 'Moderate engagement - explore ways to boost intrinsic motivation',
+                    poor: 'Low academic drive - investigate underlying causes and provide support'
+                }
+            },
+            'study_effectiveness': {
+                title: 'Study Effectiveness',
+                description: 'Measures adoption of evidence-based study techniques that improve learning and retention.',
+                why: 'Effective study techniques significantly improve exam performance and long-term retention of material.',
+                questions: [
+                    'Q7: "I test myself on important topics until I remember them"',
+                    'Q12: "I spread out my revision, rather than cramming at the last minute"',
+                    'Q15: "I summarise important information in diagrams, tables or lists"'
+                ],
+                interpretation: {
+                    excellent: 'Students use proven study techniques - likely to achieve strong results',
+                    good: 'Good study habits, but some techniques could be improved',
+                    average: 'Mixed study practices - provide training on effective techniques',
+                    poor: 'Poor study habits prevalent - urgent need for study skills training'
+                }
+            },
+            'exam_confidence': {
+                title: 'Exam Confidence',
+                description: 'Students\' belief in their ability to achieve their potential in final exams.',
+                why: 'Confidence correlates with performance - students who believe they can succeed are more likely to do so.',
+                questions: [
+                    'Outcome Q: "I am confident I will achieve my potential in my final exams"'
+                ],
+                interpretation: {
+                    excellent: 'High confidence levels - students believe in their ability to succeed',
+                    good: 'Good confidence, but some students need reassurance',
+                    average: 'Mixed confidence - identify and support less confident students',
+                    poor: 'Low confidence widespread - investigate causes and provide support'
+                }
+            },
+            'organization_skills': {
+                title: 'Organization Skills',
+                description: 'Measures students\' ability to plan, organize, and manage their academic responsibilities.',
+                why: 'Well-organized students are less stressed, more productive, and better able to balance multiple demands.',
+                questions: [
+                    'Q2: "I plan and organise my time to get my work done"',
+                    'Q22: "My books/files are organised"',
+                    'Q11: "I always meet deadlines"'
+                ],
+                interpretation: {
+                    excellent: 'Students are highly organized - a key success factor',
+                    good: 'Good organizational skills, minor improvements possible',
+                    average: 'Mixed organization - provide tools and training',
+                    poor: 'Poor organization widespread - implement organizational support systems'
+                }
+            },
+            'resilience_factor': {
+                title: 'Resilience',
+                description: 'Students\' ability to bounce back from setbacks and maintain a positive outlook.',
+                why: 'Resilient students persist through challenges and learn from failures rather than being defeated by them.',
+                questions: [
+                    'Q13: "I don\'t let a poor test/assessment result get me down for too long"',
+                    'Q8: "I have a positive view of myself"',
+                    'Q27: "I like hearing feedback about how I can improve"'
+                ],
+                interpretation: {
+                    excellent: 'High resilience - students bounce back well from setbacks',
+                    good: 'Good resilience, but some students need support',
+                    average: 'Mixed resilience - build culture of learning from mistakes',
+                    poor: 'Low resilience - implement resilience-building programs'
+                }
+            },
+            'stress_management': {
+                title: 'Stress Management',
+                description: 'Students\' ability to handle academic pressure and control exam nerves.',
+                why: 'Effective stress management improves performance, wellbeing, and prevents burnout.',
+                questions: [
+                    'Q20: "I feel I can cope with the pressure at school/college/University"',
+                    'Q28: "I can control my nerves in tests/practical assessments"'
+                ],
+                interpretation: {
+                    excellent: 'Students manage stress well - maintain supportive environment',
+                    good: 'Good stress management, but monitor for changes',
+                    average: 'Some students struggling - provide stress management resources',
+                    poor: 'High stress levels - urgent intervention needed'
+                }
+            },
+            'active_learning': {
+                title: 'Active Learning',
+                description: 'Engagement with active learning techniques that deepen understanding and retention.',
+                why: 'Active learning techniques are proven to be more effective than passive studying.',
+                questions: [
+                    'Q7: "I test myself on important topics until I remember them"',
+                    'Q23: "When preparing for a test/exam I teach someone else the material"',
+                    'Q19: "When revising I mix different kinds of topics/subjects in one study session"'
+                ],
+                interpretation: {
+                    excellent: 'Strong use of active learning - excellent practice',
+                    good: 'Good active learning, could expand techniques',
+                    average: 'Some active learning - promote more techniques',
+                    poor: 'Passive learning dominant - teach active strategies'
+                }
+            },
+            'support_readiness': {
+                title: 'Support Readiness',
+                description: 'Students\' perception of having adequate support to achieve their goals.',
+                why: 'Students who feel supported are more likely to seek help when needed and achieve better outcomes.',
+                questions: [
+                    'Outcome Q: "I have the support I need to achieve this year"'
+                ],
+                interpretation: {
+                    excellent: 'Students feel well-supported - maintain this environment',
+                    good: 'Good support perception, but some gaps exist',
+                    average: 'Mixed feelings about support - investigate specific needs',
+                    poor: 'Students feel unsupported - review support systems urgently'
+                }
+            },
+            'time_management': {
+                title: 'Time Management',
+                description: 'Students\' ability to effectively plan and use their time for academic work.',
+                why: 'Good time management reduces stress, improves work quality, and enables better work-life balance.',
+                questions: [
+                    'Q2: "I plan and organise my time to get my work done"',
+                    'Q4: "I complete all my homework on time"',
+                    'Q11: "I always meet deadlines"'
+                ],
+                interpretation: {
+                    excellent: 'Excellent time management skills across cohort',
+                    good: 'Good time management, minor improvements possible',
+                    average: 'Mixed time management - provide planning tools',
+                    poor: 'Poor time management - implement time management training'
+                }
+            },
+            'academic_confidence': {
+                title: 'Academic Confidence',
+                description: 'Students\' belief in their academic abilities and positive self-perception.',
+                why: 'Academic confidence is a strong predictor of achievement and willingness to take on challenges.',
+                questions: [
+                    'Q10: "I am confident in my academic ability"',
+                    'Q8: "I have a positive view of myself"'
+                ],
+                interpretation: {
+                    excellent: 'High academic confidence - students believe in themselves',
+                    good: 'Good confidence levels, some students need boosting',
+                    average: 'Mixed confidence - identify and support less confident students',
+                    poor: 'Low academic confidence - build success experiences'
+                }
+            },
+            'revision_readiness': {
+                title: 'Revision Readiness',
+                description: 'Students\' perception of being equipped to handle revision and study challenges.',
+                why: 'Feeling prepared for revision reduces anxiety and improves study effectiveness.',
+                questions: [
+                    'Outcome Q: "I feel equipped to face the study and revision challenges this year"'
+                ],
+                interpretation: {
+                    excellent: 'Students feel well-prepared for revision challenges',
+                    good: 'Good preparation, but some students need support',
+                    average: 'Mixed readiness - provide revision skills training',
+                    poor: 'Students feel unprepared - urgent revision support needed'
+                }
+            }
+        };
+        
+        const explanation = insightExplanations[insightId] || {};
+        const percentage = insight.data?.percent || 0;
+        let interpretationKey = 'poor';
+        if (percentage >= 80) interpretationKey = 'excellent';
+        else if (percentage >= 60) interpretationKey = 'good';
+        else if (percentage >= 40) interpretationKey = 'average';
+        
+        let modal = document.querySelector('.insight-info-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.className = 'insight-info-modal';
+            document.body.appendChild(modal);
+        }
+        
+        modal.innerHTML = `
+            <div class="insight-info-content">
+                <div class="insight-info-header">
+                    <h3>${explanation.title || insight.title}</h3>
+                    <button class="insight-info-close" onclick="window.hideInsightInfoModal()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="insight-info-body">
+                    <div class="current-score">
+                        <span class="score-label">Current Score:</span>
+                        <span class="score-value ${interpretationKey}">${percentage.toFixed(1)}%</span>
+                        <span class="score-sample">(n = ${insight.data?.n || 0})</span>
+                    </div>
+                    
+                    <div class="insight-section">
+                        <h4>What This Measures</h4>
+                        <p>${explanation.description || 'This insight helps understand student readiness and areas for improvement.'}</p>
+                    </div>
+                    
+                    <div class="insight-section">
+                        <h4>Why It Matters</h4>
+                        <p>${explanation.why || 'This metric provides valuable insights into student success factors.'}</p>
+                    </div>
+                    
+                    <div class="insight-section">
+                        <h4>Questions Included</h4>
+                        <ul class="questions-list">
+                            ${(explanation.questions || []).map(q => `<li>${q}</li>`).join('')}
+                        </ul>
+                    </div>
+                    
+                    <div class="insight-section">
+                        <h4>Your Score Interpretation</h4>
+                        <p class="interpretation ${interpretationKey}">
+                            ${explanation.interpretation?.[interpretationKey] || 'Continue monitoring this metric and provide appropriate support.'}
+                        </p>
+                    </div>
+                    
+                    <div class="insight-section">
+                        <h4>Score Ranges</h4>
+                        <div class="score-ranges">
+                            <div class="range excellent">80-100%: Excellent</div>
+                            <div class="range good">60-79%: Good</div>
+                            <div class="range average">40-59%: Needs Attention</div>
+                            <div class="range poor">0-39%: Urgent Action Required</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Add click outside to close
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                window.hideInsightInfoModal();
+            }
+        });
+        
+        // Show modal with animation
+        requestAnimationFrame(() => {
+            modal.classList.add('active');
+        });
+    };
+    
+    window.hideInsightInfoModal = function() {
+        const modal = document.querySelector('.insight-info-modal');
+        if (modal) {
+            modal.classList.remove('active');
+            // Remove after animation
+            setTimeout(() => {
+                modal.remove();
+            }, 300);
+        }
+    };
+
     let vespaDistributionChartInstances = {}; // To store multiple chart instances
     
     function renderCombinedVespaDisplay(cycle, nationalDistributions) {
@@ -3355,133 +3641,166 @@ function initializeDashboardApp() {
             </div>
         `;
         
-        // Define the 10-12 useful pre-calculated questions
+        // Define meaningful insights based on actual psychometric questions
         const insightQuestions = [
             {
-                id: 'support_awareness',
-                title: 'Support Awareness',
-                question: 'What percentage of students know where to get support?',
+                id: 'growth_mindset',
+                title: 'Growth Mindset',
+                question: 'What percentage believe intelligence can be developed?',
                 type: 'percentAgree',
-                questionIds: ['q1'], // "I know where to get support if I need it"
-                icon: '🤝'
+                questionIds: ['Q5', 'Q26'], // Growth mindset questions
+                icon: '🌱'
             },
             {
-                id: 'exam_preparedness',
-                title: 'Exam Readiness',
-                question: 'What percentage feel prepared for exams?',
+                id: 'academic_momentum',
+                title: 'Academic Momentum',
+                question: 'What percentage show strong drive and engagement?',
                 type: 'percentAgree',
-                questionIds: ['q2'], // "I feel prepared for my exams"
+                questionIds: ['Q14', 'Q16', 'Q17', 'Q9'], // Goals, enjoyment, perfectionism, hard work
+                icon: '🚀'
+            },
+            {
+                id: 'study_effectiveness',
+                title: 'Study Effectiveness',
+                question: 'What percentage use proven study techniques?',
+                type: 'percentAgree',
+                questionIds: ['Q7', 'Q12', 'Q15'], // Self-testing, spaced revision, summarizing
                 icon: '📚'
             },
             {
-                id: 'achievement_confidence',
-                title: 'Achievement Confidence',
-                question: 'What percentage believe they will achieve their potential?',
+                id: 'exam_confidence',
+                title: 'Exam Confidence',
+                question: 'What percentage feel confident about exams?',
                 type: 'percentAgree',
-                questionIds: ['q3'], // "I feel I will achieve my potential"
+                questionIds: ['OUTCOME_Q_CONFIDENT'], // Outcome question about exam confidence
                 icon: '🎯'
+            },
+            {
+                id: 'organization_skills',
+                title: 'Organization Skills',
+                question: 'What percentage are well-organized?',
+                type: 'percentAgree',
+                questionIds: ['Q2', 'Q22', 'Q11'], // Planning, organized files, deadlines
+                icon: '📋'
+            },
+            {
+                id: 'resilience_factor',
+                title: 'Resilience',
+                question: 'What percentage show academic resilience?',
+                type: 'percentAgree',
+                questionIds: ['Q13', 'Q8', 'Q27'], // Bounce back, positive view, feedback
+                icon: '💪'
             },
             {
                 id: 'stress_management',
-                title: 'Stress Levels',
-                question: 'What percentage can manage exam stress effectively?',
+                title: 'Stress Management',
+                question: 'What percentage handle pressure well?',
                 type: 'percentAgree',
-                questionIds: ['q4'], // "I can manage the stress of exams"
+                questionIds: ['Q20', 'Q28'], // Cope with pressure, control nerves
                 icon: '😌'
             },
             {
-                id: 'teacher_support',
-                title: 'Teacher Support',
-                question: 'What percentage feel supported by teachers?',
+                id: 'active_learning',
+                title: 'Active Learning',
+                question: 'What percentage engage in active learning?',
                 type: 'percentAgree',
-                questionIds: ['q5'], // "My teachers give me the support I need"
-                icon: '👩‍🏫'
+                questionIds: ['Q7', 'Q23', 'Q19'], // Self-testing, teaching others, mixing topics
+                icon: '🎓'
             },
             {
-                id: 'revision_confidence',
-                title: 'Revision Skills',
-                question: 'What percentage know how to revise effectively?',
+                id: 'support_readiness',
+                title: 'Support Readiness',
+                question: 'What percentage feel supported this year?',
                 type: 'percentAgree',
-                questionIds: ['q6'], // "I know how to revise effectively"
-                icon: '📖'
-            },
-            {
-                id: 'goal_clarity',
-                title: 'Goal Clarity',
-                question: 'What percentage have clear goals?',
-                type: 'percentAgree',
-                questionIds: ['q7'], // "I have clear goals for my future"
-                icon: '🎯'
+                questionIds: ['OUTCOME_Q_SUPPORT'], // Outcome question about support
+                icon: '🤝'
             },
             {
                 id: 'time_management',
                 title: 'Time Management',
-                question: 'What percentage manage their time well?',
+                question: 'What percentage manage time effectively?',
                 type: 'percentAgree',
-                questionIds: ['q8'], // "I manage my time effectively"
+                questionIds: ['Q2', 'Q4', 'Q11'], // Planning, homework, deadlines
                 icon: '⏰'
             },
             {
-                id: 'motivation_levels',
-                title: 'Motivation',
-                question: 'What percentage feel motivated to succeed?',
+                id: 'academic_confidence',
+                title: 'Academic Confidence',
+                question: 'What percentage are confident in their ability?',
                 type: 'percentAgree',
-                questionIds: ['q9'], // "I feel motivated to succeed"
-                icon: '🚀'
-            },
-            {
-                id: 'wellbeing_support',
-                title: 'Wellbeing Support',
-                question: 'What percentage feel the school supports their wellbeing?',
-                type: 'percentAgree',
-                questionIds: ['q10'], // "The school supports my wellbeing"
-                icon: '💚'
-            },
-            {
-                id: 'parent_support',
-                title: 'Parent Support',
-                question: 'What percentage feel supported by parents/carers?',
-                type: 'percentAgree',
-                questionIds: ['q11'], // "My parents/carers support my learning"
-                icon: '👨‍👩‍👧'
-            },
-            {
-                id: 'overall_satisfaction',
-                title: 'Overall Satisfaction',
-                question: 'What percentage are satisfied with their education?',
-                type: 'percentAgree',
-                questionIds: ['q12'], // "I am satisfied with my education"
+                questionIds: ['Q10', 'Q8'], // Academic confidence, positive self-view
                 icon: '⭐'
+            },
+            {
+                id: 'revision_readiness',
+                title: 'Revision Ready',
+                question: 'What percentage feel equipped for revision challenges?',
+                type: 'percentAgree',
+                questionIds: ['OUTCOME_Q_EQUIPPED'], // Outcome question about being equipped
+                icon: '📖'
             }
         ];
         
-        // Fetch all insights in parallel
-        const insightPromises = insightQuestions.map(async (insight) => {
-            try {
-                const res = await fetch(`${config.herokuAppUrl}/api/qla-analysis`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        analysisType: insight.type,
-                        questionIds: insight.questionIds,
-                        filters: filters
-                    })
-                });
+        // Use batch endpoint for better performance
+        try {
+            const batchRequest = {
+                analyses: insightQuestions.map(insight => ({
+                    id: insight.id,
+                    type: insight.type,
+                    questionIds: insight.questionIds
+                })),
+                filters: filters
+            };
+            
+            const res = await fetch(`${config.herokuAppUrl}/api/qla-batch-analysis`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(batchRequest)
+            });
+            
+            if (res.ok) {
+                const batchResults = await res.json();
                 
-                if (res.ok) {
-                    const data = await res.json();
-                    return { ...insight, data };
-                }
-            } catch (err) {
-                console.error(`Failed to fetch ${insight.id}:`, err);
+                // Map results back to insights
+                const insights = insightQuestions.map(insight => ({
+                    ...insight,
+                    data: batchResults[insight.id] || null
+                }));
+                
+                // Render the insights grid
+                renderInsightsGrid(insights);
+            } else {
+                throw new Error('Batch analysis failed');
             }
-            return { ...insight, data: null };
-        });
-        
-        const insights = await Promise.all(insightPromises);
-        
-        // Render the insights grid
-        renderInsightsGrid(insights);
+        } catch (err) {
+            console.error('Failed to fetch insights:', err);
+            
+            // Fallback to individual requests if batch fails
+            const insightPromises = insightQuestions.map(async (insight) => {
+                try {
+                    const res = await fetch(`${config.herokuAppUrl}/api/qla-analysis`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            analysisType: insight.type,
+                            questionIds: insight.questionIds,
+                            filters: filters
+                        })
+                    });
+                    
+                    if (res.ok) {
+                        const data = await res.json();
+                        return { ...insight, data };
+                    }
+                } catch (err) {
+                    console.error(`Failed to fetch ${insight.id}:`, err);
+                }
+                return { ...insight, data: null };
+            });
+            
+            const insights = await Promise.all(insightPromises);
+            renderInsightsGrid(insights);
+        }
     }
     
     // New function to render insights grid
@@ -3489,7 +3808,7 @@ function initializeDashboardApp() {
         const container = document.getElementById('qla-insights-grid');
         if (!container) return;
         
-        container.innerHTML = insights.map(insight => {
+        container.innerHTML = insights.map((insight, index) => {
             const hasData = insight.data && insight.data.percent !== undefined;
             const percentage = hasData ? insight.data.percent : 0;
             const sampleSize = hasData ? insight.data.n : 0;
@@ -3502,6 +3821,7 @@ function initializeDashboardApp() {
             
             return `
                 <div class="insight-card ${colorClass}">
+                    <button class="insight-info-btn" onclick="window.showInsightInfoModal('${insight.id}')" title="Learn more about ${insight.title}">i</button>
                     <div class="insight-icon">${insight.icon}</div>
                     <div class="insight-content">
                         <h4>${insight.title}</h4>
@@ -3514,13 +3834,8 @@ function initializeDashboardApp() {
             `;
         }).join('');
         
-        // Add click handlers for detailed view (future enhancement)
-        container.querySelectorAll('.insight-card').forEach((card, index) => {
-            card.addEventListener('click', () => {
-                // Future: Show detailed breakdown
-                log(`Clicked on insight: ${insights[index].title}`);
-            });
-        });
+        // Store insights data for modal access
+        window.insightsData = insights;
     }
 
     function calculateAverageScoresForQuestions(responses) {
