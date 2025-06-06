@@ -3602,11 +3602,48 @@ function initializeDashboardApp() {
                 if (!res.ok) throw new Error(`QLA analysis failed (${res.status})`);
                 const analysisData = await res.json();
 
-                // Convert to array format
+                log("QLA top/bottom analysis data:", analysisData);
+
+                // Convert to array format and map question IDs to text
+                const mapQuestionIdToText = (qid) => {
+                    // First check if we have psychometric details
+                    if (questionMappings.psychometric_details) {
+                        const detail = questionMappings.psychometric_details.find(d => 
+                            d.questionId === qid || 
+                            d.questionId === qid.toLowerCase() ||
+                            d.questionId === `q${qid.replace('Q', '')}` ||
+                            d.questionId === `q${qid.replace('q', '')}`
+                        );
+                        if (detail) return detail.questionText;
+                    }
+                    
+                    // Fallback to id_to_text mapping if available
+                    if (questionMappings.id_to_text) {
+                        // Check various field IDs that might correspond to this question
+                        for (const [fieldId, text] of Object.entries(questionMappings.id_to_text)) {
+                            // This is a simplified check - you might need to enhance this
+                            if (fieldId.includes(qid)) return text;
+                        }
+                    }
+                    
+                    return `Question ${qid}`;
+                };
+
                 const top = Object.entries(analysisData.top || {})
-                    .map(([id, score]) => ({ id, score }));
+                    .map(([id, score]) => ({ 
+                        id, 
+                        score,
+                        text: mapQuestionIdToText(id)
+                    }));
                 const bottom = Object.entries(analysisData.bottom || {})
-                    .map(([id, score]) => ({ id, score }));
+                    .map(([id, score]) => ({ 
+                        id, 
+                        score,
+                        text: mapQuestionIdToText(id)
+                    }));
+
+                log("Mapped top questions:", top);
+                log("Mapped bottom questions:", bottom);
 
                 // Render the enhanced cards
                 renderEnhancedQuestionCards(top, bottom, []);
