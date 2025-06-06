@@ -370,52 +370,8 @@ function initializeDashboardApp() {
             
         } catch (error) {
             errorLog("Failed to fetch establishments", error);
-            
-            // Fallback to the old method with better error handling
-            try {
-                log("Falling back to extracting establishments from VESPA results");
-                const establishmentMap = new Map();
-                
-                // Just fetch first page to avoid timeout
-                const vespaRecords = await fetchDataFromKnack(
-                    objectKeys.vespaResults, 
-                    [], 
-                    { rows_per_page: 100 }
-                );
-                
-                if (vespaRecords && vespaRecords.length > 0) {
-                    vespaRecords.forEach(record => {
-                        if (record.field_133_raw && record.field_133) {
-                            if (Array.isArray(record.field_133_raw)) {
-                                record.field_133_raw.forEach((id, index) => {
-                                    if (id && !establishmentMap.has(id)) {
-                                        const displayName = Array.isArray(record.field_133) ? 
-                                            record.field_133[index] : record.field_133;
-                                        establishmentMap.set(id, displayName || id);
-                                    }
-                                });
-                            } else if (typeof record.field_133_raw === 'string' && record.field_133_raw.trim()) {
-                                const id = record.field_133_raw.trim();
-                                const name = record.field_133 || id;
-                                if (!establishmentMap.has(id)) {
-                                    establishmentMap.set(id, name);
-                                }
-                            }
-                        }
-                    });
-                }
-                
-                const establishments = Array.from(establishmentMap.entries())
-                    .map(([id, name]) => ({ id, name }))
-                    .sort((a, b) => a.name.localeCompare(b.name));
-                
-                log(`Found ${establishments.length} establishments (limited sample)`);
-                return establishments;
-                
-            } catch (fallbackError) {
-                errorLog("Fallback method also failed", fallbackError);
-                return [];
-            }
+            // Don't use the fallback - it's what's causing the timeout
+            return [];
         }
     }
 
@@ -955,21 +911,57 @@ function initializeDashboardApp() {
             const cycleSelectElement = document.getElementById('cycle-select');
             const initialCycle = cycleSelectElement ? parseInt(cycleSelectElement.value, 10) : 1;
             
-            // Fetch all initial data using batch endpoint
-            GlobalLoader.updateProgress(30, 'Fetching dashboard data...');
-            const batchData = await fetchDashboardInitialData(null, establishmentId, initialCycle);
+            // Check if this is a large establishment first
+            const quickCheck = await fetch(`${config.herokuAppUrl}/api/dashboard-initial-data`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    establishmentId: establishmentId,
+                    cycle: initialCycle,
+                    rowsPerPage: 1  // Just check size
+                })
+            });
             
-            // Populate filter dropdowns from cached data
-            GlobalLoader.updateProgress(50, 'Setting up filters...');
-            populateFilterDropdownsFromCache(batchData.filterOptions);
-            
-            // Load all sections with cached data
-            GlobalLoader.updateProgress(70, 'Rendering visualizations...');
-            await Promise.all([
-                loadOverviewData(null, initialCycle, [], establishmentId),
-                loadQLAData(null, establishmentId),
-                loadStudentCommentInsights(null, establishmentId)
-            ]);
+            if (quickCheck.ok) {
+                const checkData = await quickCheck.json();
+                const totalRecords = checkData.totalRecords || 0;
+                
+                if (totalRecords > 2000) {
+                    log(`Large establishment detected: ${totalRecords} records. Using paginated loading.`);
+                    GlobalLoader.updateProgress(20, `Large dataset detected (${totalRecords} records). Optimizing load...`);
+                    
+                    // For large establishments, load data in smaller chunks
+                    const batchData = await fetchDashboardInitialDataPaginated(null, establishmentId, initialCycle);
+                    
+                    // Populate filter dropdowns from cached data
+                    GlobalLoader.updateProgress(50, 'Setting up filters...');
+                    populateFilterDropdownsFromCache(batchData.filterOptions);
+                    
+                    // Load sections with limited data
+                    GlobalLoader.updateProgress(70, 'Rendering visualizations...');
+                    await Promise.all([
+                        loadOverviewData(null, initialCycle, [], establishmentId, true), // true = limited mode
+                        loadQLAData(null, establishmentId),
+                        loadStudentCommentInsights(null, establishmentId)
+                    ]);
+                } else {
+                    // Normal flow for smaller establishments
+                    GlobalLoader.updateProgress(30, 'Fetching dashboard data...');
+                    const batchData = await fetchDashboardInitialData(null, establishmentId, initialCycle);
+                    
+                    // Populate filter dropdowns from cached data
+                    GlobalLoader.updateProgress(50, 'Setting up filters...');
+                    populateFilterDropdownsFromCache(batchData.filterOptions);
+                    
+                    // Load all sections with cached data
+                    GlobalLoader.updateProgress(70, 'Rendering visualizations...');
+                    await Promise.all([
+                        loadOverviewData(null, initialCycle, [], establishmentId),
+                        loadQLAData(null, establishmentId),
+                        loadStudentCommentInsights(null, establishmentId)
+                    ]);
+                }
+            }
             
             GlobalLoader.updateProgress(90, 'Finalizing...');
             
@@ -1039,6 +1031,49 @@ function initializeDashboardApp() {
                 log("Clearing all filters");
                 loadOverviewData(null, selectedCycle, [], establishmentId);
             });
+        }
+    }
+
+    // New paginated fetch function
+    async function fetchDashboardInitialDataPaginated(staffAdminId, establishmentId, cycle = 1) {
+        const url = `${config.herokuAppUrl}/api/dashboard-initial-data`;
+        const requestData = {
+            staffAdminId,
+            establishmentId,
+            cycle,
+            rowsPerPage: 1000,  // Fetch only first 1000 records
+            page: 1
+        };
+        
+        log("Fetching paginated dashboard initial data:", requestData);
+        
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestData)
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Batch data request failed with status ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            // Store that we're in limited mode
+            data.isLimitedMode = true;
+            data.totalAvailable = data.totalRecords || 0;
+            
+            // Cache the limited data
+            DataCache.set('initialData', data);
+            DataCache.set('vespaResults', data.vespaResults);
+            DataCache.set('nationalBenchmark', data.nationalBenchmark);
+            DataCache.set('filterOptions', data.filterOptions);
+            
+            return data;
+        } catch (error) {
+            errorLog("Failed to fetch paginated dashboard data", error);
+            throw error;
         }
     }
 
