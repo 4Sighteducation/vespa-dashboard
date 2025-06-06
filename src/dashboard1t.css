@@ -808,12 +808,57 @@ body.knack-body .kn-content {
     display: none;
 }
 
+/* --- QLA Insights Header --- */
+.qla-insights-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 3rem;
+    margin-bottom: 1.5rem;
+    position: relative;
+}
+
+.qla-insights-header h3 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    text-align: center;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-success));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.qla-insights-info-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(59, 130, 246, 0.2);
+    border: 2px solid rgba(59, 130, 246, 0.4);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    outline: none;
+    position: absolute;
+    right: 0;
+}
+
+.qla-insights-info-btn:hover {
+    background: rgba(59, 130, 246, 0.3);
+    border-color: var(--accent-primary);
+    transform: scale(1.1);
+}
+
 /* --- QLA Insights Grid --- */
 .qla-insights-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 1.5rem;
-    margin-top: 2rem;
+    margin-top: 1rem;
     margin-bottom: 3rem;
     width: 100%;
 }
@@ -2860,6 +2905,161 @@ body.knack-body .kn-content {
     
     .score-ranges {
         grid-template-columns: 1fr;
+    }
+}
+
+/* --- QLA Insights Info Modal --- */
+.qla-insights-info-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(10px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    padding: var(--spacing-md);
+}
+
+.qla-insights-info-modal.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.qla-insights-info-content {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xl);
+    max-width: 700px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+}
+
+.qla-insights-info-modal.active .qla-insights-info-content {
+    transform: scale(1);
+}
+
+.qla-insights-info-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.qla-insights-info-header h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.qla-insights-info-close {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.qla-insights-info-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: rotate(90deg);
+}
+
+.qla-insights-info-body {
+    color: var(--text-secondary);
+    line-height: 1.8;
+}
+
+.qla-insights-section {
+    margin-bottom: var(--spacing-lg);
+}
+
+.qla-insights-section h4 {
+    color: var(--text-primary);
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: var(--spacing-sm);
+}
+
+.qla-insights-section p {
+    margin-bottom: var(--spacing-sm);
+}
+
+.qla-insights-section ul {
+    margin: var(--spacing-sm) 0;
+    padding-left: var(--spacing-lg);
+}
+
+.qla-insights-section ul li {
+    margin-bottom: var(--spacing-sm);
+    color: var(--text-secondary);
+}
+
+.qla-insights-section ul li strong {
+    color: var(--text-primary);
+}
+
+.calculation-example {
+    background: var(--secondary-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    margin: var(--spacing-sm) 0;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+}
+
+.scale-list {
+    list-style: none;
+    padding: 0;
+    margin: var(--spacing-sm) 0;
+}
+
+.scale-list li {
+    padding: 0.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.scale-list li.positive {
+    color: var(--accent-success);
+    font-weight: 600;
+}
+
+/* Responsive adjustments for QLA insights modal */
+@media (max-width: 768px) {
+    .qla-insights-header {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .qla-insights-info-btn {
+        position: static;
+        margin-top: 0.5rem;
+    }
+    
+    .qla-insights-info-content {
+        padding: var(--spacing-md);
+        max-width: 95%;
     }
 }
 
