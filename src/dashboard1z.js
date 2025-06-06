@@ -55,25 +55,62 @@ const GlobalLoader = {
 // Initialize loader immediately
 GlobalLoader.init();
 
-// Data cache management
+// Enhanced Data cache management with localStorage fallback
 const DataCache = {
     vespaResults: null,
     nationalBenchmark: null,
     filterOptions: null,
     psychometricResponses: null,
     lastFetchTime: null,
-    cacheTimeout: 5 * 60 * 1000, // 5 minutes
+    cacheTimeout: 10 * 60 * 1000, // 10 minutes (increased from 5)
     isLoading: false, // Add loading flag
+    
+    // Store in localStorage for persistence
+    saveToLocalStorage(key, value) {
+        try {
+            const cacheData = {
+                data: value,
+                timestamp: Date.now()
+            };
+            localStorage.setItem(`vespa_cache_${key}`, JSON.stringify(cacheData));
+        } catch (e) {
+            console.warn('Failed to save to localStorage:', e);
+        }
+    },
+    
+    getFromLocalStorage(key) {
+        try {
+            const cached = localStorage.getItem(`vespa_cache_${key}`);
+            if (cached) {
+                const cacheData = JSON.parse(cached);
+                // Check if cache is still valid (30 minutes for localStorage)
+                if (Date.now() - cacheData.timestamp < 30 * 60 * 1000) {
+                    return cacheData.data;
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to read from localStorage:', e);
+        }
+        return null;
+    },
     
     set(key, value) {
         this[key] = value;
         this.lastFetchTime = Date.now();
+        // Also save to localStorage
+        this.saveToLocalStorage(key, value);
     },
     
     get(key) {
-        // Check if cache is still valid
+        // Check memory cache first
         if (this.lastFetchTime && (Date.now() - this.lastFetchTime) < this.cacheTimeout) {
             return this[key];
+        }
+        // Fall back to localStorage
+        const localData = this.getFromLocalStorage(key);
+        if (localData) {
+            this[key] = localData;
+            return localData;
         }
         return null;
     },
@@ -85,6 +122,16 @@ const DataCache = {
         this.psychometricResponses = null;
         this.lastFetchTime = null;
         this.isLoading = false;
+        // Clear localStorage
+        try {
+            Object.keys(localStorage).forEach(key => {
+                if (key.startsWith('vespa_cache_')) {
+                    localStorage.removeItem(key);
+                }
+            });
+        } catch (e) {
+            console.warn('Failed to clear localStorage:', e);
+        }
     },
     
     isValid() {
@@ -95,6 +142,35 @@ const DataCache = {
 // Add initialization guard
 let dashboardInitialized = false;
 let initializationInProgress = false;
+
+// Recent establishments tracking for Super Users
+const RecentEstablishments = {
+    maxRecent: 5,
+    
+    add(establishmentId, establishmentName) {
+        try {
+            let recent = this.get();
+            // Remove if already exists
+            recent = recent.filter(e => e.id !== establishmentId);
+            // Add to front
+            recent.unshift({ id: establishmentId, name: establishmentName, timestamp: Date.now() });
+            // Keep only max
+            recent = recent.slice(0, this.maxRecent);
+            localStorage.setItem('vespa_recent_establishments', JSON.stringify(recent));
+        } catch (e) {
+            console.warn('Failed to save recent establishments:', e);
+        }
+    },
+    
+    get() {
+        try {
+            const recent = localStorage.getItem('vespa_recent_establishments');
+            return recent ? JSON.parse(recent) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+};
 
 // Ensure this matches the initializerFunctionName in WorkingBridge.js
 function initializeDashboardApp() {
@@ -528,6 +604,44 @@ function initializeDashboardApp() {
                 border-radius: 4px;
             }
             
+            /* Quick Access Section */
+            .quick-access-section {
+                margin-bottom: 20px;
+                padding: 15px;
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 8px;
+            }
+            
+            .quick-access-section h4 {
+                margin: 0 0 10px 0;
+                color: #ffd700;
+                font-size: 14px;
+                font-weight: 600;
+            }
+            
+            .quick-access-buttons {
+                display: flex;
+                gap: 10px;
+                flex-wrap: wrap;
+            }
+            
+            .quick-access-btn {
+                padding: 8px 16px;
+                background: rgba(255, 215, 0, 0.1);
+                border: 1px solid rgba(255, 215, 0, 0.3);
+                color: #ffffff;
+                border-radius: 6px;
+                font-size: 13px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+            
+            .quick-access-btn:hover {
+                background: rgba(255, 215, 0, 0.2);
+                border-color: #ffd700;
+                transform: translateY(-1px);
+            }
+            
             .filters-container {
                 display: flex;
                 flex-wrap: wrap;
@@ -611,12 +725,31 @@ function initializeDashboardApp() {
         // Build the HTML with conditional Super User controls
         let superUserControlsHTML = '';
         if (showSuperUserControls) {
+            // Get recent establishments for quick access
+            const recent = RecentEstablishments.get();
+            let quickAccessHTML = '';
+            if (recent.length > 0) {
+                quickAccessHTML = `
+                    <div class="quick-access-section">
+                        <h4>Quick Access - Recent Establishments</h4>
+                        <div class="quick-access-buttons">
+                            ${recent.map(est => `
+                                <button class="quick-access-btn" data-est-id="${est.id}" data-est-name="${est.name}">
+                                    ${est.name}
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
             superUserControlsHTML = `
                 <div class="super-user-controls">
                     <div class="super-user-header">
                         <span class="super-user-badge">⚡ Super User Mode</span>
                         <span class="super-user-title">Establishment Emulator</span>
                     </div>
+                    ${quickAccessHTML}
                     <div class="super-user-form">
                         <label for="establishment-select">Select Establishment:</label>
                         <select id="establishment-select">
@@ -812,6 +945,42 @@ function initializeDashboardApp() {
                 });
             }
             
+            // Add quick access button listeners
+            document.querySelectorAll('.quick-access-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const estId = e.target.dataset.estId;
+                    const estName = e.target.dataset.estName;
+                    
+                    // Set the dropdown value
+                    if (establishmentSelect) {
+                        establishmentSelect.value = estId;
+                    }
+                    
+                    // Load the dashboard for this establishment
+                    selectedEstablishmentId = estId;
+                    selectedEstablishmentName = estName;
+                    
+                    log(`Quick loading dashboard for establishment: ${estName} (${estId})`);
+                    
+                    // Update the current viewing display
+                    const currentViewingDiv = document.getElementById('current-establishment-viewing');
+                    const currentNameSpan = document.getElementById('current-establishment-name');
+                    if (currentViewingDiv) currentViewingDiv.style.display = 'flex';
+                    if (currentNameSpan) currentNameSpan.textContent = estName;
+                    
+                    // Show all sections
+                    document.getElementById('overview-section').style.display = 'block';
+                    document.getElementById('qla-section').style.display = 'block';
+                    document.getElementById('student-insights-section').style.display = 'block';
+                    
+                    // Clear any existing cache to ensure fresh data
+                    DataCache.clear();
+                    
+                    // Load data with establishment filter
+                    await loadDashboardWithEstablishment(estId, estName);
+                });
+            });
+            
             // Load establishments
             loadEstablishmentsDropdown();
         }
@@ -831,6 +1000,9 @@ function initializeDashboardApp() {
         selectedEstablishmentName = selectedOption.textContent;
         
         log(`Loading dashboard for establishment: ${selectedEstablishmentName} (${selectedEstablishmentId})`);
+        
+        // Add to recent establishments
+        RecentEstablishments.add(selectedEstablishmentId, selectedEstablishmentName);
         
         // Update the current viewing display
         const currentViewingDiv = document.getElementById('current-establishment-viewing');
@@ -859,6 +1031,11 @@ function initializeDashboardApp() {
         establishmentSelect.disabled = true; // Disable during loading
         
         try {
+            // Trigger pre-caching in the background
+            fetch(`${config.herokuAppUrl}/api/establishments?precache=true`).catch(err => {
+                log("Failed to trigger pre-caching:", err);
+            });
+            
             const establishments = await getAllEstablishments();
             
             if (establishments.length === 0) {
