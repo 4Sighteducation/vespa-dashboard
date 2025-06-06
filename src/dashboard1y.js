@@ -348,9 +348,9 @@ function initializeDashboardApp() {
     // New function to get all unique establishments
     async function getAllEstablishments() {
         try {
-            log("Fetching establishments from dedicated endpoint");
+            log("Fetching establishments from object_2 endpoint");
             
-            // Use the new establishments endpoint
+            // Use the establishments endpoint that fetches from object_2
             const url = `${config.herokuAppUrl}/api/establishments`;
             log("Fetching from establishments endpoint:", url);
             
@@ -362,15 +362,10 @@ function initializeDashboardApp() {
             const data = await response.json();
             log(`Fetched ${data.total} establishments from ${data.source_object}`);
             
-            if (data.partial) {
-                log("Note: Partial establishment list due to size limits");
-            }
-            
             return data.establishments || [];
             
         } catch (error) {
             errorLog("Failed to fetch establishments", error);
-            // Don't use the fallback - it's what's causing the timeout
             return [];
         }
     }
@@ -520,6 +515,17 @@ function initializeDashboardApp() {
             
             .current-viewing strong {
                 color: #ffffff;
+            }
+            
+            /* Datalist styling */
+            #establishment-search-input::-webkit-calendar-picker-indicator {
+                display: none;
+            }
+            
+            #establishment-suggestions {
+                background: rgba(0, 0, 0, 0.9);
+                border: 1px solid rgba(255, 215, 0, 0.3);
+                border-radius: 4px;
             }
             
             .filters-container {
@@ -837,6 +843,9 @@ function initializeDashboardApp() {
         document.getElementById('qla-section').style.display = 'block';
         document.getElementById('student-insights-section').style.display = 'block';
         
+        // Clear any existing cache to ensure fresh data
+        DataCache.clear();
+        
         // Load data with establishment filter
         await loadDashboardWithEstablishment(selectedEstablishmentId, selectedEstablishmentName);
     }
@@ -898,6 +907,24 @@ function initializeDashboardApp() {
         });
     }
     
+    // New function to filter establishment dropdown
+    function filterEstablishmentDropdown(searchTerm) {
+        const establishmentSelect = document.getElementById('establishment-select');
+        if (!establishmentSelect) return;
+        
+        const options = establishmentSelect.querySelectorAll('option');
+        options.forEach(option => {
+            if (option.value === '') return; // Keep the placeholder
+            
+            const text = option.textContent.toLowerCase();
+            if (text.includes(searchTerm)) {
+                option.style.display = '';
+            } else {
+                option.style.display = 'none';
+            }
+        });
+    }
+    
     // New function to load dashboard with establishment filter
     async function loadDashboardWithEstablishment(establishmentId, establishmentName) {
         log(`Loading dashboard data for VESPA Customer: ${establishmentName} (${establishmentId})`);
@@ -905,6 +932,9 @@ function initializeDashboardApp() {
         // Show global loader
         GlobalLoader.init();
         GlobalLoader.updateProgress(10, `Loading data for ${establishmentName}...`);
+        
+        // Update current context
+        currentEstablishmentId = establishmentId;
         
         try {
             // Load initial data
@@ -915,6 +945,7 @@ function initializeDashboardApp() {
             GlobalLoader.updateProgress(30, 'Fetching dashboard data...');
             
             try {
+                // Pass null for staffAdminId since we're in Super User mode
                 const batchData = await fetchDashboardInitialData(null, establishmentId, initialCycle);
                 
                 // Check if we're in limited mode
