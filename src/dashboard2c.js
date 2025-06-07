@@ -900,23 +900,8 @@ function initializeDashboardApp() {
             </div>
         `;
         
-        // === NEW: Print Report button ===
-        const headerElem = container.querySelector('header');
-        if (headerElem) {
-            const printBtn = document.createElement('button');
-            printBtn.id = 'print-report-btn';
-            printBtn.className = 'print-report-btn';
-            printBtn.innerHTML = `
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"></path>
-                    <rect x="6" y="14" width="12" height="8" rx="2" ry="2"></rect>
-                </svg>
-                <span>Print Report</span>`;
-            headerElem.appendChild(printBtn);
-            printBtn.addEventListener('click', async () => {
-                await generatePrintReport();
-            });
-        }
+        // Add print report button after dashboard is rendered
+        addPrintReportButton();
         
         // Add event listeners for UI elements
         
@@ -4829,6 +4814,153 @@ function initializeDashboardApp() {
         `;
     }
 
+    // --- Print Report Functions ---
+    async function generatePrintReport() {
+        try {
+            // Show loading state
+            GlobalLoader.init();
+            GlobalLoader.updateProgress(10, 'Gathering report data...');
+            
+            // Get current dashboard state
+            const cycleSelect = document.getElementById('cycle-select');
+            const currentCycle = cycleSelect ? parseInt(cycleSelect.value) : 1;
+            
+            // Get establishment info
+            const establishmentName = selectedEstablishmentName || 
+                document.getElementById('current-establishment-name')?.textContent || 
+                'Unknown Establishment';
+            
+            // Collect VESPA scores from the dashboard
+            const vespaScores = collectVespaScores();
+            
+            // Collect QLA insights
+            const qlaInsights = collectQLAInsights();
+            
+            GlobalLoader.updateProgress(30, 'Generating PDF report...');
+            
+            // Prepare request data
+            const reportData = {
+                establishmentId: currentEstablishmentId || selectedEstablishmentId,
+                establishmentName: establishmentName,
+                staffAdminId: currentStaffAdminId,
+                cycle: currentCycle,
+                vespaScores: vespaScores,
+                qlaInsights: qlaInsights,
+                filters: getActiveFilters()
+            };
+            
+            // Call backend to generate PDF
+            const response = await fetch(`${config.herokuAppUrl}/api/generate-report`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(reportData)
+            });
+            
+            GlobalLoader.updateProgress(70, 'Preparing download...');
+            
+            if (!response.ok) {
+                throw new Error(`Failed to generate report: ${response.status}`);
+            }
+            
+            // Get the PDF blob
+            const blob = await response.blob();
+            
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `VESPA_Report_${establishmentName.replace(/\s+/g, '_')}_Cycle${currentCycle}_${new Date().toISOString().split('T')[0]}.pdf`;
+            
+            // Trigger download
+            document.body.appendChild(a);
+            a.click();
+            
+            // Cleanup
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            GlobalLoader.updateProgress(100, 'Report downloaded!');
+            setTimeout(() => GlobalLoader.hide(), 1000);
+            
+        } catch (error) {
+            console.error('Failed to generate report:', error);
+            GlobalLoader.hide();
+            alert('Failed to generate report. Please try again or contact support.');
+        }
+    }
+
+    // Helper function to collect VESPA scores from the dashboard
+    function collectVespaScores() {
+        const scores = {};
+        
+        // Get school scores from the score cards
+        const scoreCards = document.querySelectorAll('.vespa-score-card');
+        scoreCards.forEach(card => {
+            const title = card.querySelector('h3')?.textContent?.toLowerCase();
+            const scoreValue = card.querySelector('.score-value')?.textContent;
+            const nationalComparison = card.querySelector('.national-comparison')?.textContent;
+            
+            if (title && scoreValue) {
+                scores[title] = parseFloat(scoreValue) || 0;
+                
+                // Extract national average from comparison text
+                const nationalMatch = nationalComparison?.match(/Global:\s*([\d.]+)/);
+                if (nationalMatch) {
+                    scores[`${title}National`] = parseFloat(nationalMatch[1]) || 0;
+                }
+            }
+        });
+        
+        return scores;
+    }
+
+    // Helper function to collect QLA insights
+    function collectQLAInsights() {
+        const insights = [];
+        
+        // Get insights from the insights grid
+        const insightCards = document.querySelectorAll('.insight-card');
+        insightCards.forEach(card => {
+            const title = card.querySelector('h4')?.textContent;
+            const percentage = card.querySelector('.insight-percentage')?.textContent;
+            const question = card.querySelector('.insight-question')?.textContent;
+            
+            if (title && percentage) {
+                insights.push({
+                    title: title,
+                    percentage: parseFloat(percentage) || 0,
+                    question: question || ''
+                });
+            }
+        });
+        
+        // Sort by percentage descending
+        insights.sort((a, b) => b.percentage - a.percentage);
+        
+        return insights;
+    }
+
+    // Add print button to the dashboard header
+    function addPrintReportButton() {
+        const headerElem = document.querySelector('#dashboard-container header');
+        if (headerElem && !document.getElementById('print-report-btn')) {
+            const printBtn = document.createElement('button');
+            printBtn.id = 'print-report-btn';
+            printBtn.className = 'print-report-btn';
+            printBtn.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8" rx="2" ry="2"></rect>
+                </svg>
+                <span>Generate Report</span>`;
+            
+            printBtn.addEventListener('click', generatePrintReport);
+            headerElem.appendChild(printBtn);
+        }
+    }
+
     // --- Initialization ---
     async function initializeFullDashboard() {
         const targetElement = document.querySelector(elementSelector);
@@ -5073,75 +5205,6 @@ function initializeDashboardApp() {
     }
     
     initializeFullDashboard(); // Call the main async initialization function
-
-    // --- NEW: Generate printable report ---
-    async function generatePrintReport() {
-        try {
-            GlobalLoader.init();
-            GlobalLoader.updateProgress(10, 'Preparing report...');
-
-            // Attempt to get AI commentary (fallback to placeholder)
-            let aiSummary = 'Comprehensive commentary will appear here once AI integration is enabled.';
-            try {
-                const aiRes = await fetch(`${config.herokuAppUrl}/api/qla-chat`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        query: 'Provide a concise, professional summary of the dashboard insights suitable for a printed report.',
-                        questionData: DataCache.get('psychometricResponses') || []
-                    })
-                });
-                if (aiRes.ok) {
-                    const aiData = await aiRes.json();
-                    if (aiData.answer) aiSummary = aiData.answer;
-                }
-            } catch (e) {
-                log('AI summary generation failed, using placeholder.', e);
-            }
-
-            // Capture existing sections
-            const overviewHTML = document.getElementById('overview-section')?.outerHTML || '';
-            const qlaHTML = document.getElementById('qla-section')?.outerHTML || '';
-
-            // Collect current styles so charts render properly
-            const styleTags = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-                .map(el => el.outerHTML)
-                .join('\n');
-
-            const reportWin = window.open('', '_blank');
-            reportWin.document.write(`
-                <html>
-                    <head>
-                        <title>VESPA Dashboard Report</title>
-                        ${styleTags}
-                        <style>
-                            @media print { .print-report-btn, .super-user-controls, .filter-toggle-container { display: none !important; } }
-                            body { background: #fff; color: #000; }
-                            #dashboard-container { background: none; }
-                        </style>
-                    </head>
-                    <body>
-                        <h1 style="text-align:center; margin-top:1rem;">VESPA Dashboard Report</h1>
-                        <section> <h2>1. Project Overview</h2><p>${aiSummary}</p> </section>
-                        <section> <h2>2. VESPA Scores</h2>${overviewHTML}</section>
-                        <section> <h2>3. Question Level Analysis</h2>${qlaHTML}</section>
-                        <section> <h2>4. Intervention Ideas / Strategies</h2><p>Placeholder for intervention content.</p> </section>
-                        <section> <h2>5. Summary / Conclusion</h2><p>${aiSummary}</p> </section>
-                    </body>
-                </html>`);
-            reportWin.document.close();
-
-            GlobalLoader.updateProgress(90, 'Generating print preview...');
-            setTimeout(() => {
-                reportWin.print();
-                GlobalLoader.hide();
-            }, 1000);
-        } catch (err) {
-            errorLog('Failed to generate print report', err);
-            GlobalLoader.hide();
-            alert('Unable to generate report. Please try again.');
-        }
-    }
 }
 
 // Defensive check: If jQuery is used by Knack/other scripts, ensure this script runs after.

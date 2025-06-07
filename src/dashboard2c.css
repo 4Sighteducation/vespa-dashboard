@@ -131,6 +131,48 @@ body.knack-body .kn-content {
     position: relative;
 }
 
+/* Print Report Button */
+#print-report-btn,
+.print-report-btn {
+    position: absolute;
+    top: 50%;
+    right: 2rem;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.75rem 1.25rem;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    z-index: 10;
+}
+
+#print-report-btn:hover,
+.print-report-btn:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-50%) translateY(-2px);
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
+}
+
+#print-report-btn:active,
+.print-report-btn:active {
+    transform: translateY(-50%) translateY(0);
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+#print-report-btn svg,
+.print-report-btn svg {
+    stroke: currentColor;
+    flex-shrink: 0;
+}
+
 #dashboard-container header h1 {
     font-size: clamp(1.5rem, 3vw, 2.5rem);
     font-weight: 800;
@@ -1750,6 +1792,28 @@ body.knack-body .kn-content {
     }
 }
 
+/* Responsive adjustments for print button */
+@media (max-width: 768px) {
+    #print-report-btn,
+    .print-report-btn {
+        position: static;
+        transform: none;
+        margin-top: 1rem;
+        width: 100%;
+        justify-content: center;
+    }
+    
+    #print-report-btn:hover,
+    .print-report-btn:hover {
+        transform: translateY(-2px);
+    }
+    
+    #print-report-btn:active,
+    .print-report-btn:active {
+        transform: translateY(0);
+    }
+}
+
 @media (max-width: 768px) {
     #dashboard-container {
         padding: var(--spacing-sm);
@@ -3109,6 +3173,14 @@ body.knack-body .kn-content {
 #print-report-btn svg,
 .print-report-btn svg {
     stroke: currentColor;
+}
+
+/* Hide print button in print view */
+@media print {
+    #print-report-btn,
+    .print-report-btn {
+        display: none !important;
+    }
 }
 
 #print-report-btn:hover,
