@@ -1151,6 +1151,9 @@ function initializeDashboardApp() {
                 await loadStudentCommentInsights(null, establishmentId);
                 GlobalLoader.updateProgress(90, 'Finalizing...');
                 
+                // Add print report button after dashboard loads
+                addPrintReportButton();
+                
             } catch (fetchError) {
                 // If the initial fetch fails, show a more helpful error message
                 errorLog("Failed to fetch dashboard data", fetchError);
@@ -4849,6 +4852,8 @@ function initializeDashboardApp() {
                 filters: getActiveFilters()
             };
             
+            log('Report data being sent to backend:', reportData);
+            
             // Call backend to generate PDF
             const response = await fetch(`${config.herokuAppUrl}/api/generate-report`, {
                 method: 'POST',
@@ -4897,22 +4902,34 @@ function initializeDashboardApp() {
         
         // Get school scores from the score cards
         const scoreCards = document.querySelectorAll('.vespa-score-card');
+        log(`Found ${scoreCards.length} VESPA score cards`);
+        
         scoreCards.forEach(card => {
             const title = card.querySelector('h3')?.textContent?.toLowerCase();
             const scoreValue = card.querySelector('.score-value')?.textContent;
             const nationalComparison = card.querySelector('.national-comparison')?.textContent;
             
-            if (title && scoreValue) {
-                scores[title] = parseFloat(scoreValue) || 0;
-                
-                // Extract national average from comparison text
-                const nationalMatch = nationalComparison?.match(/Global:\s*([\d.]+)/);
-                if (nationalMatch) {
-                    scores[`${title}National`] = parseFloat(nationalMatch[1]) || 0;
+            log(`Processing card - Title: ${title}, Score: ${scoreValue}, National: ${nationalComparison}`);
+            
+            if (title && scoreValue && scoreValue !== 'N/A') {
+                // Parse the score value, handling potential formatting
+                const parsedScore = parseFloat(scoreValue.replace(/[^0-9.-]/g, ''));
+                if (!isNaN(parsedScore)) {
+                    scores[title] = parsedScore;
+                    
+                    // Extract national average from comparison text
+                    const nationalMatch = nationalComparison?.match(/Global:\s*([\d.]+)/);
+                    if (nationalMatch) {
+                        const nationalScore = parseFloat(nationalMatch[1]);
+                        if (!isNaN(nationalScore)) {
+                            scores[`${title}National`] = nationalScore;
+                        }
+                    }
                 }
             }
         });
         
+        log('Collected VESPA scores:', scores);
         return scores;
     }
 
@@ -4922,23 +4939,32 @@ function initializeDashboardApp() {
         
         // Get insights from the insights grid
         const insightCards = document.querySelectorAll('.insight-card');
+        log(`Found ${insightCards.length} QLA insight cards`);
+        
         insightCards.forEach(card => {
             const title = card.querySelector('h4')?.textContent;
-            const percentage = card.querySelector('.insight-percentage')?.textContent;
+            const percentageText = card.querySelector('.insight-percentage')?.textContent;
             const question = card.querySelector('.insight-question')?.textContent;
             
-            if (title && percentage) {
-                insights.push({
-                    title: title,
-                    percentage: parseFloat(percentage) || 0,
-                    question: question || ''
-                });
+            log(`Processing insight - Title: ${title}, Percentage: ${percentageText}, Question: ${question}`);
+            
+            if (title && percentageText) {
+                // Parse percentage, removing % sign and any other characters
+                const parsedPercentage = parseFloat(percentageText.replace(/[^0-9.-]/g, ''));
+                if (!isNaN(parsedPercentage)) {
+                    insights.push({
+                        title: title,
+                        percentage: parsedPercentage,
+                        question: question || ''
+                    });
+                }
             }
         });
         
         // Sort by percentage descending
         insights.sort((a, b) => b.percentage - a.percentage);
         
+        log('Collected QLA insights:', insights);
         return insights;
     }
 
@@ -4959,6 +4985,14 @@ function initializeDashboardApp() {
             printBtn.addEventListener('click', generatePrintReport);
             headerElem.appendChild(printBtn);
         }
+        
+        // Also try to add the button after a delay if the dashboard is still loading
+        setTimeout(() => {
+            const headerElem = document.querySelector('#dashboard-container header');
+            if (headerElem && !document.getElementById('print-report-btn')) {
+                addPrintReportButton();
+            }
+        }, 2000);
     }
 
     // --- Initialization ---
@@ -5105,6 +5139,9 @@ function initializeDashboardApp() {
                 // Load overview section first, then other sections
                 GlobalLoader.updateProgress(70, 'Rendering dashboard...');
                 await loadOverviewData(staffAdminRecordId, initialCycle);
+                
+                // Add print report button after dashboard loads
+                addPrintReportButton();
                 
                 // Load other sections in background after main dashboard is ready
                 setTimeout(async () => {
