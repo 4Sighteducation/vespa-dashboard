@@ -900,6 +900,24 @@ function initializeDashboardApp() {
             </div>
         `;
         
+        // === NEW: Print Report button ===
+        const headerElem = container.querySelector('header');
+        if (headerElem) {
+            const printBtn = document.createElement('button');
+            printBtn.id = 'print-report-btn';
+            printBtn.className = 'print-report-btn';
+            printBtn.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8" rx="2" ry="2"></rect>
+                </svg>
+                <span>Print Report</span>`;
+            headerElem.appendChild(printBtn);
+            printBtn.addEventListener('click', async () => {
+                await generatePrintReport();
+            });
+        }
+        
         // Add event listeners for UI elements
         
         // Add filter toggle functionality
@@ -5055,6 +5073,75 @@ function initializeDashboardApp() {
     }
     
     initializeFullDashboard(); // Call the main async initialization function
+
+    // --- NEW: Generate printable report ---
+    async function generatePrintReport() {
+        try {
+            GlobalLoader.init();
+            GlobalLoader.updateProgress(10, 'Preparing report...');
+
+            // Attempt to get AI commentary (fallback to placeholder)
+            let aiSummary = 'Comprehensive commentary will appear here once AI integration is enabled.';
+            try {
+                const aiRes = await fetch(`${config.herokuAppUrl}/api/qla-chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        query: 'Provide a concise, professional summary of the dashboard insights suitable for a printed report.',
+                        questionData: DataCache.get('psychometricResponses') || []
+                    })
+                });
+                if (aiRes.ok) {
+                    const aiData = await aiRes.json();
+                    if (aiData.answer) aiSummary = aiData.answer;
+                }
+            } catch (e) {
+                log('AI summary generation failed, using placeholder.', e);
+            }
+
+            // Capture existing sections
+            const overviewHTML = document.getElementById('overview-section')?.outerHTML || '';
+            const qlaHTML = document.getElementById('qla-section')?.outerHTML || '';
+
+            // Collect current styles so charts render properly
+            const styleTags = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+                .map(el => el.outerHTML)
+                .join('\n');
+
+            const reportWin = window.open('', '_blank');
+            reportWin.document.write(`
+                <html>
+                    <head>
+                        <title>VESPA Dashboard Report</title>
+                        ${styleTags}
+                        <style>
+                            @media print { .print-report-btn, .super-user-controls, .filter-toggle-container { display: none !important; } }
+                            body { background: #fff; color: #000; }
+                            #dashboard-container { background: none; }
+                        </style>
+                    </head>
+                    <body>
+                        <h1 style="text-align:center; margin-top:1rem;">VESPA Dashboard Report</h1>
+                        <section> <h2>1. Project Overview</h2><p>${aiSummary}</p> </section>
+                        <section> <h2>2. VESPA Scores</h2>${overviewHTML}</section>
+                        <section> <h2>3. Question Level Analysis</h2>${qlaHTML}</section>
+                        <section> <h2>4. Intervention Ideas / Strategies</h2><p>Placeholder for intervention content.</p> </section>
+                        <section> <h2>5. Summary / Conclusion</h2><p>${aiSummary}</p> </section>
+                    </body>
+                </html>`);
+            reportWin.document.close();
+
+            GlobalLoader.updateProgress(90, 'Generating print preview...');
+            setTimeout(() => {
+                reportWin.print();
+                GlobalLoader.hide();
+            }, 1000);
+        } catch (err) {
+            errorLog('Failed to generate print report', err);
+            GlobalLoader.hide();
+            alert('Unable to generate report. Please try again.');
+        }
+    }
 }
 
 // Defensive check: If jQuery is used by Knack/other scripts, ensure this script runs after.

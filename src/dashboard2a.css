@@ -3088,3 +3088,39 @@ body.knack-body .kn-content {
         font-size: 3.5rem;
     }
 }
+
+/* === NEW: Print Report Button === */
+#print-report-btn,
+.print-report-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.5rem 1rem;
+    background: var(--accent-primary);
+    color: #ffffff;
+    border: none;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-left: 1rem;
+}
+
+#print-report-btn svg,
+.print-report-btn svg {
+    stroke: currentColor;
+}
+
+#print-report-btn:hover,
+.print-report-btn:hover {
+    background: var(--accent-success);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+@media print {
+    #print-report-btn,
+    .print-report-btn {
+        display: none !important;
+    }
+}
