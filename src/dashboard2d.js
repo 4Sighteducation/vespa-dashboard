@@ -2511,6 +2511,20 @@ function initializeDashboardApp() {
 
         log(`Creating score cards for Cycle ${cycle}. School:`, schoolData, "Global:", nationalData);
 
+        // Store VESPA scores globally for report generation
+        currentVespaScores = {};
+        Object.keys(schoolData).forEach(key => {
+            if (typeof schoolData[key] === 'number') {
+                currentVespaScores[key] = schoolData[key];
+            }
+        });
+        Object.keys(nationalData).forEach(key => {
+            if (typeof nationalData[key] === 'number') {
+                currentVespaScores[`${key}National`] = nationalData[key];
+            }
+        });
+        log('Stored VESPA scores globally:', currentVespaScores);
+
         const elementsToDisplay = [
             { key: 'vision', name: 'VISION', position: 1 },
             { key: 'effort', name: 'EFFORT', position: 2 },
@@ -4214,6 +4228,18 @@ function initializeDashboardApp() {
         const container = document.getElementById('qla-insights-grid');
         if (!container) return;
         
+        // Store insights globally for report generation
+        currentQLAInsights = insights.map(insight => {
+            const hasData = insight.data && insight.data.percent !== undefined;
+            const percentage = hasData ? insight.data.percent : 0;
+            return {
+                title: insight.title,
+                percentage: percentage,
+                question: insight.question || ''
+            };
+        });
+        log('Stored QLA insights globally:', currentQLAInsights);
+        
         container.innerHTML = insights.map((insight, index) => {
             const hasData = insight.data && insight.data.percent !== undefined;
             const percentage = hasData ? insight.data.percent : 0;
@@ -4896,9 +4922,18 @@ function initializeDashboardApp() {
         }
     }
 
+    // Global variable to store current VESPA data
+    let currentVespaScores = {};
+    
     // Helper function to collect VESPA scores from the dashboard
     function collectVespaScores() {
         const scores = {};
+        
+        // First try to use the stored global data if available
+        if (Object.keys(currentVespaScores).length > 0) {
+            log('Using stored VESPA scores:', currentVespaScores);
+            return currentVespaScores;
+        }
         
         // Get school scores from the score cards
         const scoreCards = document.querySelectorAll('.vespa-score-card');
@@ -4929,12 +4964,26 @@ function initializeDashboardApp() {
             }
         });
         
+        // Store globally for future use
+        if (Object.keys(scores).length > 0) {
+            currentVespaScores = scores;
+        }
+        
         log('Collected VESPA scores:', scores);
         return scores;
     }
 
+    // Global variable to store current QLA insights
+    let currentQLAInsights = [];
+    
     // Helper function to collect QLA insights
     function collectQLAInsights() {
+        // First try to use the stored global data if available
+        if (currentQLAInsights.length > 0) {
+            log('Using stored QLA insights:', currentQLAInsights);
+            return currentQLAInsights;
+        }
+        
         const insights = [];
         
         // Get insights from the insights grid
@@ -4963,6 +5012,11 @@ function initializeDashboardApp() {
         
         // Sort by percentage descending
         insights.sort((a, b) => b.percentage - a.percentage);
+        
+        // Store globally for future use
+        if (insights.length > 0) {
+            currentQLAInsights = insights;
+        }
         
         log('Collected QLA insights:', insights);
         return insights;
