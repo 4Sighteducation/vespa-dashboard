@@ -5327,18 +5327,3 @@ if (document.readyState === 'loading') {
 // If it's not already, you might need:
 // window.initializeDashboardApp = initializeDashboardApp;
 // However, since it's a top-level function in the script, it should be.
-
-// Helper — is the report ready to generate?
-function isReportDataReady() {
-    return currentVespaScores && Object.keys(currentVespaScores).length >= 12 &&
-           currentQLAInsights && currentQLAInsights.length > 0;
-}
-
-// Enable / disable the print-report button based on readiness
-function updatePrintButtonState() {
-    const btn = document.getElementById('print-report-btn');
-    if (!btn) return;
-    const ready = isReportDataReady();
-    btn.disabled = !ready;
-    btn.classList.toggle('disabled', !ready);
-}
