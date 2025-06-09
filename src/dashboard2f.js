@@ -4,9 +4,10 @@
 // lobal loader management
 if (window.VESPA_DASHBOARD_LOADED) {
     console.log('VESPA Dashboard script already loaded');
-    return;
+    // Already loaded, do not initialize again
+} else {
+    window.VESPA_DASHBOARD_LOADED = true;
 }
-window.VESPA_DASHBOARD_LOADED = true;
 
 const GlobalLoader = {
     overlay: null,
