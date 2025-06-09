@@ -3196,3 +3196,14 @@ body.knack-body .kn-content {
         display: none !important;
     }
 }
+
+#print-report-btn.disabled,
+#print-report-btn:disabled,
+.print-report-btn.disabled,
+.print-report-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+    transform: none !important;
+    box-shadow: none !important;
+}

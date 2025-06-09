@@ -4970,6 +4970,7 @@ function initializeDashboardApp() {
         }
         
         log('Collected VESPA scores:', scores);
+        updatePrintButtonState();
         return scores;
     }
 
@@ -5019,6 +5020,7 @@ function initializeDashboardApp() {
         }
         
         log('Collected QLA insights:', insights);
+        updatePrintButtonState();
         return insights;
     }
 
@@ -5036,7 +5038,18 @@ function initializeDashboardApp() {
                 </svg>
                 <span>Generate Report</span>`;
             
-            printBtn.addEventListener('click', generatePrintReport);
+            // Initially disabled until data ready
+            printBtn.disabled = true;
+
+            printBtn.addEventListener('click', (e) => {
+                // Safety-check — shouldn't be clickable when disabled, but defensive code helps
+                if (!isReportDataReady()) {
+                    alert('Report not ready yet – wait for data to finish loading.');
+                    return;
+                }
+                generatePrintReport();
+            });
+
             headerElem.appendChild(printBtn);
         }
         
@@ -5046,6 +5059,7 @@ function initializeDashboardApp() {
             if (headerElem && !document.getElementById('print-report-btn')) {
                 addPrintReportButton();
             }
+            updatePrintButtonState();
         }, 2000);
     }
 
@@ -5313,3 +5327,18 @@ if (document.readyState === 'loading') {
 // If it's not already, you might need:
 // window.initializeDashboardApp = initializeDashboardApp;
 // However, since it's a top-level function in the script, it should be.
+
+// Helper — is the report ready to generate?
+function isReportDataReady() {
+    return currentVespaScores && Object.keys(currentVespaScores).length >= 12 &&
+           currentQLAInsights && currentQLAInsights.length > 0;
+}
+
+// Enable / disable the print-report button based on readiness
+function updatePrintButtonState() {
+    const btn = document.getElementById('print-report-btn');
+    if (!btn) return;
+    const ready = isReportDataReady();
+    btn.disabled = !ready;
+    btn.classList.toggle('disabled', !ready);
+}
