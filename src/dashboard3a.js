@@ -4932,6 +4932,31 @@ function initializeDashboardApp() {
     // Global variable to store current VESPA data
     let currentVespaScores = {};
     
+    // Global variable to store current QLA insights
+    let currentQLAInsights = [];
+    
+    // Helper function to check if report data is ready
+    function isReportDataReady() {
+        // Check if we have VESPA scores and QLA insights
+        const hasVespaScores = Object.keys(currentVespaScores).length > 0;
+        const hasQLAInsights = currentQLAInsights.length > 0;
+        return hasVespaScores || hasQLAInsights;
+    }
+
+    // Update print button state based on data availability
+    function updatePrintButtonState() {
+        const printBtn = document.getElementById('print-report-btn');
+        if (printBtn) {
+            const dataReady = isReportDataReady();
+            printBtn.disabled = !dataReady;
+            if (dataReady) {
+                printBtn.classList.add('ready');
+            } else {
+                printBtn.classList.remove('ready');
+            }
+        }
+    }
+    
     // Helper function to collect VESPA scores from the dashboard
     function collectVespaScores() {
         const scores = {};
@@ -4980,9 +5005,6 @@ function initializeDashboardApp() {
         updatePrintButtonState();
         return scores;
     }
-
-    // Global variable to store current QLA insights
-    let currentQLAInsights = [];
     
     // Helper function to collect QLA insights
     function collectQLAInsights() {
