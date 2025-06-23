@@ -15,9 +15,15 @@ const GlobalLoader = {
     progressText: null,
     
     init() {
+        // Remove any existing loader first
+        const existing = document.getElementById('global-loading-overlay');
+        if (existing) {
+            existing.remove();
+        }
+        
         // Create loader HTML immediately
         const loaderHTML = `
-            <div class="global-loading-overlay active" id="global-loading-overlay">
+            <div class="global-loading-overlay active" id="global-loading-overlay" style="z-index: 999999 !important;">
                 <div class="loading-content">
                     <div class="spinner"></div>
                     <div class="loading-text">Initializing VESPA Dashboard</div>
@@ -29,12 +35,21 @@ const GlobalLoader = {
             </div>
         `;
         
-        // Insert at the beginning of body
-        document.body.insertAdjacentHTML('afterbegin', loaderHTML);
+        // Insert at the end of body to ensure it's on top of everything
+        document.body.insertAdjacentHTML('beforeend', loaderHTML);
         
         this.overlay = document.getElementById('global-loading-overlay');
         this.progressBar = document.getElementById('loading-progress-bar');
         this.progressText = this.overlay.querySelector('.loading-subtext');
+        
+        // Force the overlay to the top by ensuring proper z-index
+        if (this.overlay) {
+            this.overlay.style.position = 'fixed';
+            this.overlay.style.top = '0';
+            this.overlay.style.left = '0';
+            this.overlay.style.width = '100%';
+            this.overlay.style.height = '100%';
+        }
     },
     
     updateProgress(percentage, text) {
@@ -5268,9 +5283,57 @@ function initializeDashboardApp() {
                         const selectedCycle = parseInt(event.target.value, 10);
                         log(`Cycle changed to: ${selectedCycle}`);
                         
-                        // Don't clear entire cache, just invalidate cycle-specific data
-                        const activeFilters = getActiveFilters();
-                        await loadOverviewData(staffAdminRecordId, selectedCycle, activeFilters);
+                        // Show loading overlay for cycle change
+                        GlobalLoader.init();
+                        GlobalLoader.updateProgress(10, `Loading data for Cycle ${selectedCycle}...`);
+                        
+                        try {
+                            // Check if we have cached data for this cycle
+                            const cacheKey = `cycle_${selectedCycle}_data`;
+                            const cachedCycleData = DataCache.getFromLocalStorage(cacheKey);
+                            
+                            if (cachedCycleData) {
+                                GlobalLoader.updateProgress(50, 'Loading cached data...');
+                                // Use cached data
+                                DataCache.set('vespaResults', cachedCycleData.vespaResults);
+                                DataCache.set('nationalBenchmark', cachedCycleData.nationalBenchmark);
+                                
+                                // Update UI with cached data
+                                updateResponseStatsFromCache(cachedCycleData.vespaResults, selectedCycle);
+                                const schoolAverages = calculateSchoolVespaAverages(cachedCycleData.vespaResults, selectedCycle);
+                                const nationalAverages = getNationalVespaAveragesFromRecord(cachedCycleData.nationalBenchmark, selectedCycle);
+                                renderCombinedVespaDisplay(selectedCycle, {});
+                                
+                                GlobalLoader.updateProgress(100, 'Dashboard updated!');
+                                setTimeout(() => GlobalLoader.hide(), 300);
+                            } else {
+                                // Fetch fresh data
+                                GlobalLoader.updateProgress(30, 'Fetching data from server...');
+                                const activeFilters = getActiveFilters();
+                                
+                                // Fetch data for new cycle
+                                const batchData = await fetchDashboardInitialData(staffAdminRecordId, null, selectedCycle);
+                                
+                                // Cache the cycle data
+                                DataCache.saveToLocalStorage(cacheKey, {
+                                    vespaResults: batchData.vespaResults,
+                                    nationalBenchmark: batchData.nationalBenchmark,
+                                    timestamp: Date.now()
+                                });
+                                
+                                GlobalLoader.updateProgress(70, 'Rendering dashboard...');
+                                await loadOverviewData(staffAdminRecordId, selectedCycle, activeFilters);
+                                
+                                GlobalLoader.updateProgress(100, 'Dashboard updated!');
+                                setTimeout(() => GlobalLoader.hide(), 500);
+                            }
+                        } catch (error) {
+                            errorLog("Error changing cycle", error);
+                            GlobalLoader.hide();
+                            // Fallback to original method
+                            const activeFilters = getActiveFilters();
+                            await loadOverviewData(staffAdminRecordId, selectedCycle, activeFilters);
+                        }
                     });
                 }
                 
@@ -5292,11 +5355,23 @@ function initializeDashboardApp() {
                     if (filterTimeout) clearTimeout(filterTimeout);
                     
                     // Debounce filter application
-                    filterTimeout = setTimeout(() => {
+                    filterTimeout = setTimeout(async () => {
+                        GlobalLoader.init();
+                        GlobalLoader.updateProgress(20, 'Applying filters...');
+                        
                         const selectedCycle = cycleSelectElement ? parseInt(cycleSelectElement.value, 10) : 1;
                         const activeFilters = getActiveFilters();
                         log("Applying filters:", activeFilters);
-                        loadOverviewData(staffAdminRecordId, selectedCycle, activeFilters);
+                        
+                        try {
+                            GlobalLoader.updateProgress(40, 'Processing filtered data...');
+                            await loadOverviewData(staffAdminRecordId, selectedCycle, activeFilters);
+                            GlobalLoader.updateProgress(100, 'Filters applied!');
+                            setTimeout(() => GlobalLoader.hide(), 300);
+                        } catch (error) {
+                            errorLog("Error applying filters", error);
+                            GlobalLoader.hide();
+                        }
                     }, 300); // 300ms debounce
                 });
             }
