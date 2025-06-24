@@ -1297,6 +1297,21 @@ function initializeDashboardApp() {
             
             log('Setting up analysis type modal event listeners');
             
+            // For debugging - temporarily enable the continue button
+            if (continueBtn) {
+                log('Continue button found, current state:', {
+                    disabled: continueBtn.disabled,
+                    display: continueBtn.style.display,
+                    opacity: continueBtn.style.opacity
+                });
+                
+                // TEMPORARY: Enable button for testing
+                continueBtn.disabled = false;
+                continueBtn.style.opacity = '1';
+                continueBtn.style.cursor = 'pointer';
+                log('TEMPORARY: Continue button enabled for testing');
+            }
+            
             // Radio button change handlers using event delegation
             modal.addEventListener('change', (e) => {
                 if (e.target.name === 'analysis-type') {
@@ -1321,9 +1336,43 @@ function initializeDashboardApp() {
                     // Enable continue button
                     if (continueBtn) {
                         continueBtn.disabled = false;
+                        continueBtn.style.opacity = '1';
+                        continueBtn.style.cursor = 'pointer';
                         log('Continue button enabled');
                     }
                 }
+            });
+            
+            // Also add click handlers to the analysis options for better UX
+            document.querySelectorAll('.analysis-option').forEach(option => {
+                option.addEventListener('click', (e) => {
+                    log('Analysis option clicked:', option.dataset.type);
+                    
+                    // Don't trigger if clicking directly on the radio button
+                    if (e.target.type === 'radio') return;
+                    
+                    const radio = option.querySelector('input[type="radio"]');
+                    if (radio) {
+                        log('Setting radio button checked:', radio.value);
+                        radio.checked = true;
+                        
+                        // Manually trigger change event
+                        const changeEvent = new Event('change', { bubbles: true });
+                        radio.dispatchEvent(changeEvent);
+                        log('Change event dispatched');
+                    }
+                });
+            });
+            
+            // Also add direct click handlers to radio buttons
+            document.querySelectorAll('input[name="analysis-type"]').forEach(radio => {
+                radio.addEventListener('click', (e) => {
+                    log('Radio button directly clicked:', e.target.value);
+                    
+                    // Manually trigger change event to ensure it fires
+                    const changeEvent = new Event('change', { bubbles: true });
+                    e.target.dispatchEvent(changeEvent);
+                });
             });
             
             // Trust dropdown change handler
@@ -1340,8 +1389,19 @@ function initializeDashboardApp() {
             
             // Continue button handler
             continueBtn.addEventListener('click', (e) => {
-                log('Continue button clicked');
+                log('Continue button clicked, disabled state:', continueBtn.disabled);
                 e.preventDefault();
+                e.stopPropagation();
+                
+                // Check if an analysis type is selected
+                const selectedType = document.querySelector('input[name="analysis-type"]:checked');
+                if (!selectedType) {
+                    log('No analysis type selected');
+                    alert('Please select an analysis type first');
+                    return;
+                }
+                
+                log('Analysis type selected:', selectedType.value);
                 handleAnalysisTypeContinue();
             });
             
@@ -6032,4 +6092,27 @@ window.testAnalysisModal = function() {
     console.log('Radio buttons found:', radios.length);
     
     return { modal, continueBtn, cancelBtn, radios };
+};
+
+// Test function to simulate selecting the first radio button
+window.testSelectFirstOption = function() {
+    const firstRadio = document.querySelector('input[name="analysis-type"]');
+    if (firstRadio) {
+        console.log('Selecting first radio button:', firstRadio.value);
+        firstRadio.checked = true;
+        
+        // Trigger change event
+        const changeEvent = new Event('change', { bubbles: true });
+        firstRadio.dispatchEvent(changeEvent);
+        
+        console.log('Radio button selected and change event triggered');
+        
+        // Check continue button state
+        const continueBtn = document.getElementById('analysis-continue-btn');
+        if (continueBtn) {
+            console.log('Continue button disabled after selection:', continueBtn.disabled);
+        }
+    } else {
+        console.log('No radio buttons found');
+    }
 };
