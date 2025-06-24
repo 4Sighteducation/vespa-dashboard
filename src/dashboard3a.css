@@ -27,10 +27,12 @@
     
     /* Accent Colors */
     --accent-primary: #3b82f6;
+    --accent-primary-dark: #2563eb;
     --accent-success: #10b981;
     --accent-warning: #f59e0b;
     --accent-danger: #ef4444;
     --border-color: rgba(255, 255, 255, 0.1);
+    --card-hover-bg: #1e2f50;
     
     /* Spacing */
     --spacing-xs: 0.5rem;
@@ -3183,6 +3185,226 @@ body.knack-body .kn-content {
     }
 }
 
+/* === ACADEMY TRUST ANALYSIS STYLES === */
+
+/* Analysis Type Modal */
+.analysis-type-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(10px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.analysis-type-modal.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.analysis-type-content {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    max-width: 500px;
+    width: 90%;
+    text-align: center;
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+}
+
+.analysis-type-modal.active .analysis-type-content {
+    transform: scale(1);
+}
+
+.analysis-type-content h3 {
+    color: var(--text-primary);
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.analysis-options {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin: 2rem 0;
+}
+
+.analysis-option {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.analysis-option:hover {
+    border-color: var(--accent-primary);
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.analysis-option.selected {
+    border-color: var(--accent-primary);
+    background: rgba(59, 130, 246, 0.2);
+}
+
+.analysis-option input[type="radio"] {
+    margin: 0;
+}
+
+.analysis-option-content {
+    text-align: left;
+}
+
+.analysis-option-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+}
+
+.analysis-option-desc {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.analysis-type-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 2rem;
+}
+
+.analysis-type-btn {
+    padding: 0.75rem 2rem;
+    border: none;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.analysis-type-btn.primary {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.analysis-type-btn.primary:hover {
+    background: var(--accent-primary-dark);
+}
+
+.analysis-type-btn.primary:disabled {
+    background: var(--text-muted);
+    cursor: not-allowed;
+}
+
+.analysis-type-btn.secondary {
+    background: var(--card-hover-bg);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.analysis-type-btn.secondary:hover {
+    background: var(--border-color);
+}
+
+/* Trust Selection */
+.trust-selection {
+    margin-top: 1rem;
+}
+
+.trust-dropdown {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--card-bg);
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+/* Trust Header */
+.trust-header {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05));
+    border: 2px solid rgba(16, 185, 129, 0.3);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.trust-name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--accent-success);
+    margin-bottom: 0.5rem;
+}
+
+.trust-schools-count {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+/* Trust School Filter */
+.trust-school-filter {
+    margin-bottom: 1rem;
+}
+
+.trust-school-filter select {
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--card-bg);
+    color: var(--text-primary);
+}
+
+/* Trust Analysis Note */
+.trust-analysis-note {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    color: #10b981;
+    text-align: center;
+}
+
+/* Responsive adjustments for trust modal */
+@media (max-width: 768px) {
+    .analysis-type-content {
+        padding: 1.5rem;
+        max-width: 95%;
+    }
+    
+    .analysis-type-content h3 {
+        font-size: 1.3rem;
+    }
+    
+    .analysis-option {
+        padding: 0.75rem;
+    }
+    
+    .analysis-type-buttons {
+        flex-direction: column;
+    }
+    
+    .analysis-type-btn {
+        width: 100%;
+    }
+}
+
 #print-report-btn:hover,
 .print-report-btn:hover {
     background: var(--accent-success);
@@ -3196,3 +3418,4 @@ body.knack-body .kn-content {
         display: none !important;
     }
 }
+
