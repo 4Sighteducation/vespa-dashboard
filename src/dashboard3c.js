@@ -258,6 +258,9 @@ function initializeDashboardApp() {
     let superUserRecordId = null;
     let selectedEstablishmentId = null;
     let selectedEstablishmentName = null;
+    let currentAnalysisType = null; // 'school' or 'trust'
+    let currentTrustName = null;
+    let currentTrustSchools = [];
     
     // Track current data context
     let currentStaffAdminId = null;
@@ -741,6 +744,184 @@ function initializeDashboardApp() {
                 align-items: flex-end;
                 min-width: auto;
             }
+            
+            /* Analysis Type Modal */
+            .analysis-type-modal {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.8);
+                backdrop-filter: blur(10px);
+                z-index: 10000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                opacity: 0;
+                visibility: hidden;
+                transition: all 0.3s ease;
+            }
+            
+            .analysis-type-modal.active {
+                opacity: 1;
+                visibility: visible;
+            }
+            
+            .analysis-type-content {
+                background: var(--card-bg);
+                border: 1px solid var(--border-color);
+                border-radius: var(--radius-lg);
+                padding: 2rem;
+                max-width: 500px;
+                width: 90%;
+                text-align: center;
+                transform: scale(0.9);
+                transition: transform 0.3s ease;
+            }
+            
+            .analysis-type-modal.active .analysis-type-content {
+                transform: scale(1);
+            }
+            
+            .analysis-type-content h3 {
+                color: var(--text-primary);
+                font-size: 1.5rem;
+                margin-bottom: 1.5rem;
+            }
+            
+            .analysis-options {
+                display: flex;
+                flex-direction: column;
+                gap: 1rem;
+                margin: 2rem 0;
+            }
+            
+            .analysis-option {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                padding: 1rem;
+                border: 2px solid var(--border-color);
+                border-radius: var(--radius-md);
+                cursor: pointer;
+                transition: all 0.3s ease;
+                background: rgba(255, 255, 255, 0.05);
+            }
+            
+            .analysis-option:hover {
+                border-color: var(--accent-primary);
+                background: rgba(59, 130, 246, 0.1);
+            }
+            
+            .analysis-option.selected {
+                border-color: var(--accent-primary);
+                background: rgba(59, 130, 246, 0.2);
+            }
+            
+            .analysis-option input[type="radio"] {
+                margin: 0;
+            }
+            
+            .analysis-option-content {
+                text-align: left;
+            }
+            
+            .analysis-option-title {
+                font-weight: 600;
+                color: var(--text-primary);
+                margin-bottom: 0.25rem;
+            }
+            
+            .analysis-option-desc {
+                font-size: 0.9rem;
+                color: var(--text-secondary);
+            }
+            
+            .analysis-type-buttons {
+                display: flex;
+                gap: 1rem;
+                justify-content: center;
+                margin-top: 2rem;
+            }
+            
+            .analysis-type-btn {
+                padding: 0.75rem 2rem;
+                border: none;
+                border-radius: var(--radius-md);
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            }
+            
+            .analysis-type-btn.primary {
+                background: var(--accent-primary);
+                color: white;
+            }
+            
+            .analysis-type-btn.primary:hover {
+                background: var(--accent-primary-dark);
+            }
+            
+            .analysis-type-btn.secondary {
+                background: var(--card-hover-bg);
+                color: var(--text-secondary);
+                border: 1px solid var(--border-color);
+            }
+            
+            .analysis-type-btn.secondary:hover {
+                background: var(--border-color);
+            }
+            
+            /* Trust Selection */
+            .trust-selection {
+                margin-top: 1rem;
+            }
+            
+            .trust-dropdown {
+                width: 100%;
+                padding: 0.75rem;
+                border: 1px solid var(--border-color);
+                border-radius: var(--radius-md);
+                background: var(--card-bg);
+                color: var(--text-primary);
+                font-size: 1rem;
+            }
+            
+            /* Trust Header */
+            .trust-header {
+                background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05));
+                border: 2px solid rgba(16, 185, 129, 0.3);
+                border-radius: 12px;
+                padding: 1rem;
+                margin-bottom: 1rem;
+                text-align: center;
+            }
+            
+            .trust-name {
+                font-size: 1.25rem;
+                font-weight: 700;
+                color: var(--accent-success);
+                margin-bottom: 0.5rem;
+            }
+            
+            .trust-schools-count {
+                font-size: 0.9rem;
+                color: var(--text-secondary);
+            }
+            
+            /* Trust School Filter */
+            .trust-school-filter {
+                margin-bottom: 1rem;
+            }
+            
+            .trust-school-filter select {
+                padding: 0.5rem;
+                border: 1px solid var(--border-color);
+                border-radius: var(--radius-md);
+                background: var(--card-bg);
+                color: var(--text-primary);
+            }
         `;
         document.head.appendChild(style);
         
@@ -769,10 +950,25 @@ function initializeDashboardApp() {
                 <div class="super-user-controls">
                     <div class="super-user-header">
                         <span class="super-user-badge">⚡ Super User Mode</span>
-                        <span class="super-user-title">Establishment Emulator</span>
+                        <span class="super-user-title">Analysis Dashboard</span>
+                    </div>
+                    <div class="super-user-form">
+                        <button id="choose-analysis-type-btn" class="analysis-type-btn primary">
+                            Choose Analysis Type
+                        </button>
+                    </div>
+                    <div id="trust-header" class="trust-header" style="display: none;">
+                        <div class="trust-name" id="current-trust-name">-</div>
+                        <div class="trust-schools-count" id="current-trust-schools">-</div>
+                    </div>
+                    <div id="trust-school-filter" class="trust-school-filter" style="display: none;">
+                        <label for="trust-school-select">Filter by School:</label>
+                        <select id="trust-school-select">
+                            <option value="">All Schools in Trust</option>
+                        </select>
                     </div>
                     ${quickAccessHTML}
-                    <div class="super-user-form">
+                    <div id="establishment-controls" class="super-user-form" style="display: none;">
                         <label for="establishment-select">Select Establishment:</label>
                         <select id="establishment-select">
                             <option value="">Loading establishments...</option>
@@ -782,6 +978,39 @@ function initializeDashboardApp() {
                     </div>
                     <div id="current-establishment-viewing" class="current-viewing" style="display: none;">
                         <span>Currently viewing:</span> <strong id="current-establishment-name">-</strong>
+                    </div>
+                </div>
+                
+                <!-- Analysis Type Modal -->
+                <div id="analysis-type-modal" class="analysis-type-modal">
+                    <div class="analysis-type-content">
+                        <h3>Choose Analysis Type</h3>
+                        <div class="analysis-options">
+                            <div class="analysis-option" data-type="school">
+                                <input type="radio" name="analysis-type" value="school" id="analysis-school">
+                                <div class="analysis-option-content">
+                                    <div class="analysis-option-title">Single School Analysis</div>
+                                    <div class="analysis-option-desc">Analyze data for one specific school</div>
+                                </div>
+                            </div>
+                            <div class="analysis-option" data-type="trust">
+                                <input type="radio" name="analysis-type" value="trust" id="analysis-trust">
+                                <div class="analysis-option-content">
+                                    <div class="analysis-option-title">Academy Trust Analysis</div>
+                                    <div class="analysis-option-desc">Analyze aggregated data across multiple schools in a trust</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="trust-selection" class="trust-selection" style="display: none;">
+                            <label for="trust-dropdown">Select Academy Trust:</label>
+                            <select id="trust-dropdown" class="trust-dropdown">
+                                <option value="">Loading trusts...</option>
+                            </select>
+                        </div>
+                        <div class="analysis-type-buttons">
+                            <button id="analysis-continue-btn" class="analysis-type-btn primary" disabled>Continue</button>
+                            <button id="analysis-cancel-btn" class="analysis-type-btn secondary">Cancel</button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -958,6 +1187,15 @@ function initializeDashboardApp() {
             const establishmentSelect = document.getElementById('establishment-select');
             const establishmentSearch = document.getElementById('establishment-search');
             const loadEstablishmentBtn = document.getElementById('load-establishment-btn');
+            const chooseAnalysisBtn = document.getElementById('choose-analysis-type-btn');
+            
+            // Analysis type modal listeners
+            if (chooseAnalysisBtn) {
+                chooseAnalysisBtn.addEventListener('click', showAnalysisTypeModal);
+            }
+            
+            // Modal event listeners
+            setupAnalysisTypeModal();
             
             if (loadEstablishmentBtn) {
                 loadEstablishmentBtn.addEventListener('click', handleEstablishmentLoad);
@@ -1008,6 +1246,298 @@ function initializeDashboardApp() {
             
             // Load establishments
             loadEstablishmentsDropdown();
+        }
+    }
+    
+    // === ANALYSIS TYPE MODAL FUNCTIONS ===
+    
+    // Analysis Type Modal Functions
+    function showAnalysisTypeModal() {
+        const modal = document.getElementById('analysis-type-modal');
+        if (modal) {
+            modal.classList.add('active');
+            loadTrustsDropdown(); // Load trusts when modal opens
+        }
+    }
+    
+    function hideAnalysisTypeModal() {
+        const modal = document.getElementById('analysis-type-modal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    }
+    
+    function setupAnalysisTypeModal() {
+        const modal = document.getElementById('analysis-type-modal');
+        const continueBtn = document.getElementById('analysis-continue-btn');
+        const cancelBtn = document.getElementById('analysis-cancel-btn');
+        const trustSelection = document.getElementById('trust-selection');
+        
+        // Radio button change handlers
+        document.querySelectorAll('input[name="analysis-type"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const selectedType = e.target.value;
+                
+                // Update option styling
+                document.querySelectorAll('.analysis-option').forEach(opt => {
+                    opt.classList.remove('selected');
+                });
+                e.target.closest('.analysis-option').classList.add('selected');
+                
+                // Show/hide trust selection
+                if (selectedType === 'trust') {
+                    trustSelection.style.display = 'block';
+                } else {
+                    trustSelection.style.display = 'none';
+                }
+                
+                // Enable continue button
+                continueBtn.disabled = false;
+            });
+        });
+        
+        // Trust dropdown change handler
+        const trustDropdown = document.getElementById('trust-dropdown');
+        if (trustDropdown) {
+            trustDropdown.addEventListener('change', (e) => {
+                // Enable continue button when trust is selected
+                const selectedType = document.querySelector('input[name="analysis-type"]:checked')?.value;
+                continueBtn.disabled = !(selectedType === 'school' || (selectedType === 'trust' && e.target.value));
+            });
+        }
+        
+        // Continue button handler
+        if (continueBtn) {
+            continueBtn.addEventListener('click', handleAnalysisTypeContinue);
+        }
+        
+        // Cancel button handler
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', hideAnalysisTypeModal);
+        }
+        
+        // Close modal when clicking outside
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    hideAnalysisTypeModal();
+                }
+            });
+        }
+    }
+    
+    async function handleAnalysisTypeContinue() {
+        const selectedType = document.querySelector('input[name="analysis-type"]:checked')?.value;
+        
+        if (!selectedType) {
+            alert('Please select an analysis type');
+            return;
+        }
+        
+        currentAnalysisType = selectedType;
+        
+        if (selectedType === 'school') {
+            // Show school selection controls
+            document.getElementById('establishment-controls').style.display = 'flex';
+            document.getElementById('trust-header').style.display = 'none';
+            document.getElementById('trust-school-filter').style.display = 'none';
+            
+            // Load establishments if not already loaded
+            await loadEstablishmentsDropdown();
+            
+        } else if (selectedType === 'trust') {
+            const trustDropdown = document.getElementById('trust-dropdown');
+            const selectedTrustValue = trustDropdown.value;
+            
+            if (!selectedTrustValue) {
+                alert('Please select an Academy Trust');
+                return;
+            }
+            
+            // Parse trust data
+            const trustData = JSON.parse(selectedTrustValue);
+            currentTrustName = trustData.name;
+            
+            // Show trust header and hide school controls
+            document.getElementById('trust-header').style.display = 'block';
+            document.getElementById('current-trust-name').textContent = currentTrustName;
+            document.getElementById('establishment-controls').style.display = 'none';
+            
+            // Load trust schools and show trust-specific filter
+            await loadTrustSchools(trustData.id);
+        }
+        
+        hideAnalysisTypeModal();
+        
+        // Show dashboard sections
+        document.getElementById('overview-section').style.display = 'block';
+        document.getElementById('qla-section').style.display = 'block';
+        document.getElementById('student-insights-section').style.display = 'block';
+        
+        // Load initial data
+        if (selectedType === 'trust') {
+            await loadTrustDashboard();
+        }
+    }
+    
+    async function loadTrustsDropdown() {
+        const trustDropdown = document.getElementById('trust-dropdown');
+        if (!trustDropdown) return;
+        
+        try {
+            log("Loading trusts from establishments...");
+            
+            // Get all establishments
+            const establishments = await getAllEstablishments();
+            
+            // Extract unique trust names from field_3480 (Academy Trust field)
+            const trustMap = new Map();
+            
+            establishments.forEach(est => {
+                // For now, we'll simulate trust data since we don't have the actual field_3480 data
+                // In production, you'd check est.field_3480 or est.field_3480_raw
+                const trustName = est.academy_trust || est.field_3480 || est.field_3480_raw;
+                
+                if (trustName && trustName.trim()) {
+                    if (!trustMap.has(trustName)) {
+                        trustMap.set(trustName, {
+                            id: trustName.toLowerCase().replace(/\s+/g, '-'),
+                            name: trustName,
+                            schools: []
+                        });
+                    }
+                    trustMap.get(trustName).schools.push(est);
+                }
+            });
+            
+            // For testing with small trust, let's create a sample trust
+            if (trustMap.size === 0) {
+                // Create a sample trust with first few establishments
+                const sampleTrust = {
+                    id: 'sample-trust',
+                    name: 'Sample Academy Trust',
+                    schools: establishments.slice(0, Math.min(3, establishments.length))
+                };
+                trustMap.set(sampleTrust.name, sampleTrust);
+            }
+            
+            // Clear and populate dropdown
+            trustDropdown.innerHTML = '<option value="">Select Academy Trust...</option>';
+            
+            Array.from(trustMap.values()).forEach(trust => {
+                const option = document.createElement('option');
+                option.value = JSON.stringify(trust);
+                option.textContent = `${trust.name} (${trust.schools.length} schools)`;
+                trustDropdown.appendChild(option);
+            });
+            
+            log(`Loaded ${trustMap.size} trusts`);
+            
+        } catch (error) {
+            errorLog('Failed to load trusts', error);
+            trustDropdown.innerHTML = '<option value="">Error loading trusts</option>';
+        }
+    }
+    
+    async function loadTrustSchools(trustId) {
+        const trustSchoolSelect = document.getElementById('trust-school-select');
+        const trustSchoolsCount = document.getElementById('current-trust-schools');
+        
+        try {
+            // Get trust data from the dropdown
+            const trustDropdown = document.getElementById('trust-dropdown');
+            const trustData = JSON.parse(trustDropdown.value);
+            currentTrustSchools = trustData.schools;
+            
+            // Update schools count
+            trustSchoolsCount.textContent = `${currentTrustSchools.length} schools`;
+            
+            // Populate school filter dropdown
+            trustSchoolSelect.innerHTML = '<option value="">All Schools in Trust</option>';
+            
+            currentTrustSchools.forEach(school => {
+                const option = document.createElement('option');
+                option.value = school.id;
+                option.textContent = school.name;
+                trustSchoolSelect.appendChild(option);
+            });
+            
+            // Show the school filter
+            document.getElementById('trust-school-filter').style.display = 'block';
+            
+            // Add event listener for school filter changes
+            trustSchoolSelect.addEventListener('change', async (e) => {
+                const selectedSchoolId = e.target.value;
+                if (selectedSchoolId) {
+                    // Filter to specific school within trust
+                    const selectedSchool = currentTrustSchools.find(s => s.id === selectedSchoolId);
+                    if (selectedSchool) {
+                        await loadDashboardWithEstablishment(selectedSchool.id, selectedSchool.name);
+                    }
+                } else {
+                    // Show all schools in trust
+                    await loadTrustDashboard();
+                }
+            });
+            
+            log(`Loaded ${currentTrustSchools.length} schools for trust`);
+            
+        } catch (error) {
+            errorLog('Failed to load trust schools', error);
+        }
+    }
+    
+    async function loadTrustDashboard() {
+        if (!currentTrustSchools || currentTrustSchools.length === 0) {
+            errorLog('No trust schools available');
+            return;
+        }
+        
+        log(`Loading dashboard for trust: ${currentTrustName} with ${currentTrustSchools.length} schools`);
+        
+        try {
+            // For now, we'll aggregate data from all schools in the trust
+            // In a production implementation, you'd want to:
+            // 1. Fetch data for all schools in parallel
+            // 2. Aggregate the results
+            // 3. Display combined statistics
+            
+            // For the small trust test, let's just load the first school's data
+            // and show a note that it's trust-wide analysis
+            const firstSchool = currentTrustSchools[0];
+            
+            // Clear any existing cache to ensure fresh data
+            DataCache.clear();
+            
+            // Load data for the first school as a proof of concept
+            await loadDashboardWithEstablishment(firstSchool.id, `${currentTrustName} (Trust-wide)`);
+            
+            // Add a note about trust analysis
+            const overviewSection = document.getElementById('overview-section');
+            if (overviewSection) {
+                const existingNote = overviewSection.querySelector('.trust-analysis-note');
+                if (!existingNote) {
+                    const note = document.createElement('div');
+                    note.className = 'trust-analysis-note';
+                    note.style.cssText = `
+                        background: rgba(16, 185, 129, 0.1);
+                        border: 1px solid rgba(16, 185, 129, 0.3);
+                        border-radius: 8px;
+                        padding: 1rem;
+                        margin-bottom: 1rem;
+                        color: #10b981;
+                        text-align: center;
+                    `;
+                    note.innerHTML = `
+                        <strong>Trust-wide Analysis</strong><br>
+                        Showing aggregated data for ${currentTrustName} (${currentTrustSchools.length} schools)
+                    `;
+                    overviewSection.insertBefore(note, overviewSection.firstChild.nextSibling);
+                }
+            }
+            
+        } catch (error) {
+            errorLog('Failed to load trust dashboard', error);
         }
     }
     
