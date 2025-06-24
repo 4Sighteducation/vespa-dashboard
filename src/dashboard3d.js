@@ -1194,9 +1194,6 @@ function initializeDashboardApp() {
                 chooseAnalysisBtn.addEventListener('click', showAnalysisTypeModal);
             }
             
-            // Modal event listeners
-            setupAnalysisTypeModal();
-            
             if (loadEstablishmentBtn) {
                 loadEstablishmentBtn.addEventListener('click', handleEstablishmentLoad);
             }
@@ -1257,77 +1254,123 @@ function initializeDashboardApp() {
         if (modal) {
             modal.classList.add('active');
             loadTrustsDropdown(); // Load trusts when modal opens
+            
+            // Ensure event listeners are set up when modal is shown
+            setTimeout(() => {
+                setupAnalysisTypeModal();
+            }, 50);
         }
     }
     
     function hideAnalysisTypeModal() {
+        log('hideAnalysisTypeModal called');
         const modal = document.getElementById('analysis-type-modal');
         if (modal) {
             modal.classList.remove('active');
+            log('Modal hidden');
+        } else {
+            log('Modal not found when trying to hide');
         }
     }
     
     function setupAnalysisTypeModal() {
-        const modal = document.getElementById('analysis-type-modal');
-        const continueBtn = document.getElementById('analysis-continue-btn');
-        const cancelBtn = document.getElementById('analysis-cancel-btn');
-        const trustSelection = document.getElementById('trust-selection');
-        
-        // Radio button change handlers
-        document.querySelectorAll('input[name="analysis-type"]').forEach(radio => {
-            radio.addEventListener('change', (e) => {
-                const selectedType = e.target.value;
-                
-                // Update option styling
-                document.querySelectorAll('.analysis-option').forEach(opt => {
-                    opt.classList.remove('selected');
-                });
-                e.target.closest('.analysis-option').classList.add('selected');
-                
-                // Show/hide trust selection
-                if (selectedType === 'trust') {
-                    trustSelection.style.display = 'block';
-                } else {
-                    trustSelection.style.display = 'none';
+        // Use a timeout to ensure DOM elements are ready
+        setTimeout(() => {
+            const modal = document.getElementById('analysis-type-modal');
+            const continueBtn = document.getElementById('analysis-continue-btn');
+            const cancelBtn = document.getElementById('analysis-cancel-btn');
+            const trustSelection = document.getElementById('trust-selection');
+            
+            // Check if elements exist before adding listeners
+            if (!modal || !continueBtn || !cancelBtn) {
+                log('Analysis type modal elements not found, retrying...');
+                // Retry after a longer delay
+                setTimeout(setupAnalysisTypeModal, 500);
+                return;
+            }
+            
+            // Check if already set up to prevent duplicate listeners
+            if (modal.dataset.setupComplete === 'true') {
+                log('Analysis type modal already set up, skipping...');
+                return;
+            }
+            
+            log('Setting up analysis type modal event listeners');
+            
+            // Radio button change handlers using event delegation
+            modal.addEventListener('change', (e) => {
+                if (e.target.name === 'analysis-type') {
+                    const selectedType = e.target.value;
+                    log('Radio button changed to:', selectedType);
+                    
+                    // Update option styling
+                    document.querySelectorAll('.analysis-option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    e.target.closest('.analysis-option').classList.add('selected');
+                    
+                    // Show/hide trust selection
+                    if (trustSelection) {
+                        if (selectedType === 'trust') {
+                            trustSelection.style.display = 'block';
+                        } else {
+                            trustSelection.style.display = 'none';
+                        }
+                    }
+                    
+                    // Enable continue button
+                    if (continueBtn) {
+                        continueBtn.disabled = false;
+                        log('Continue button enabled');
+                    }
                 }
-                
-                // Enable continue button
-                continueBtn.disabled = false;
             });
-        });
-        
-        // Trust dropdown change handler
-        const trustDropdown = document.getElementById('trust-dropdown');
-        if (trustDropdown) {
-            trustDropdown.addEventListener('change', (e) => {
-                // Enable continue button when trust is selected
-                const selectedType = document.querySelector('input[name="analysis-type"]:checked')?.value;
-                continueBtn.disabled = !(selectedType === 'school' || (selectedType === 'trust' && e.target.value));
+            
+            // Trust dropdown change handler
+            const trustDropdown = document.getElementById('trust-dropdown');
+            if (trustDropdown) {
+                trustDropdown.addEventListener('change', (e) => {
+                    // Enable continue button when trust is selected
+                    const selectedType = document.querySelector('input[name="analysis-type"]:checked')?.value;
+                    if (continueBtn) {
+                        continueBtn.disabled = !(selectedType === 'school' || (selectedType === 'trust' && e.target.value));
+                    }
+                });
+            }
+            
+            // Continue button handler
+            continueBtn.addEventListener('click', (e) => {
+                log('Continue button clicked');
+                e.preventDefault();
+                handleAnalysisTypeContinue();
             });
-        }
-        
-        // Continue button handler
-        if (continueBtn) {
-            continueBtn.addEventListener('click', handleAnalysisTypeContinue);
-        }
-        
-        // Cancel button handler
-        if (cancelBtn) {
-            cancelBtn.addEventListener('click', hideAnalysisTypeModal);
-        }
-        
-        // Close modal when clicking outside
-        if (modal) {
+            
+            // Cancel button handler
+            cancelBtn.addEventListener('click', (e) => {
+                log('Cancel button clicked');
+                e.preventDefault();
+                hideAnalysisTypeModal();
+            });
+            
+            // Close modal when clicking outside
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
                     hideAnalysisTypeModal();
                 }
             });
-        }
+            
+            // Mark as set up to prevent duplicate listeners
+            modal.dataset.setupComplete = 'true';
+            
+            log('Analysis type modal event listeners set up successfully');
+        }, 100);
     }
     
     async function handleAnalysisTypeContinue() {
+        log('handleAnalysisTypeContinue called');
+        
         const selectedType = document.querySelector('input[name="analysis-type"]:checked')?.value;
+        log('Selected analysis type:', selectedType);
         
         if (!selectedType) {
             alert('Please select an analysis type');
@@ -5957,7 +6000,36 @@ if (document.readyState === 'loading') {
     // initializeDashboardApp(); // Or call if DOM is already ready, though WorkingBridge is preferred.
 }
 
-// Make sure initializeDashboardApp is globally accessible if WorkingBridge.js calls it.
+    // Make sure initializeDashboardApp is globally accessible if WorkingBridge.js calls it.
 // If it's not already, you might need:
 // window.initializeDashboardApp = initializeDashboardApp;
 // However, since it's a top-level function in the script, it should be.
+
+// Debug function to test modal buttons (remove after testing)
+window.testAnalysisModal = function() {
+    console.log('Testing analysis modal...');
+    const modal = document.getElementById('analysis-type-modal');
+    const continueBtn = document.getElementById('analysis-continue-btn');
+    const cancelBtn = document.getElementById('analysis-cancel-btn');
+    
+    console.log('Modal found:', !!modal);
+    console.log('Continue button found:', !!continueBtn);
+    console.log('Cancel button found:', !!cancelBtn);
+    
+    if (continueBtn) {
+        console.log('Continue button disabled:', continueBtn.disabled);
+        console.log('Continue button style.display:', continueBtn.style.display);
+        console.log('Continue button computed style:', window.getComputedStyle(continueBtn).display);
+    }
+    
+    if (cancelBtn) {
+        console.log('Cancel button style.display:', cancelBtn.style.display);
+        console.log('Cancel button computed style:', window.getComputedStyle(cancelBtn).display);
+    }
+    
+    // Test radio buttons
+    const radios = document.querySelectorAll('input[name="analysis-type"]');
+    console.log('Radio buttons found:', radios.length);
+    
+    return { modal, continueBtn, cancelBtn, radios };
+};
