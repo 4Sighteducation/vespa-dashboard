@@ -1485,60 +1485,114 @@ function initializeDashboardApp() {
     
     async function loadTrustsDropdown() {
         const trustDropdown = document.getElementById('trust-dropdown');
-        if (!trustDropdown) return;
+        if (!trustDropdown) {
+            log('Trust dropdown not found');
+            return;
+        }
         
         try {
-            log("Loading trusts from establishments...");
+            log("Loading Academy Trusts from backend...");
+            trustDropdown.innerHTML = '<option value="">Loading trusts...</option>';
             
-            // Get all establishments
+            // Try to use the dedicated academy trusts endpoint first
+            try {
+                const trustResponse = await fetch(`${config.herokuAppUrl}/api/academy-trusts`);
+                if (trustResponse.ok) {
+                    const trustData = await trustResponse.json();
+                    log(`Fetched ${trustData.trusts.length} trusts from academy-trusts endpoint`);
+                    
+                    if (trustData.trusts && trustData.trusts.length > 0) {
+                        // Clear and populate dropdown with real trust data
+                        trustDropdown.innerHTML = '<option value="">Select Academy Trust...</option>';
+                        
+                        trustData.trusts.forEach(trust => {
+                            const option = document.createElement('option');
+                            option.value = JSON.stringify(trust);
+                            option.textContent = `${trust.name} (${trust.schools.length} schools)`;
+                            trustDropdown.appendChild(option);
+                        });
+                        
+                        log(`Successfully loaded ${trustData.trusts.length} Academy Trusts from API`);
+                        return;
+                    } else {
+                        log('No trusts found in API response, falling back to manual parsing');
+                    }
+                } else {
+                    log(`Academy trusts API returned status ${trustResponse.status}, falling back to manual parsing`);
+                }
+            } catch (apiError) {
+                log('Academy trusts API error, falling back to manual parsing:', apiError.message);
+            }
+            
+            // Fallback: Get all establishments and extract trust information manually
+            log("Fetching establishments to manually extract Academy Trust data...");
             const establishments = await getAllEstablishments();
+            log(`Fetched ${establishments.length} establishments for manual trust analysis`);
             
-            // Extract unique trust names from field_3480 (Academy Trust field)
+            if (establishments.length === 0) {
+                trustDropdown.innerHTML = '<option value="">No establishments available</option>';
+                return;
+            }
+            
+            // Extract unique trust names from establishments using field_3480
             const trustMap = new Map();
+            let establishmentsWithTrusts = 0;
             
             establishments.forEach(est => {
-                // For now, we'll simulate trust data since we don't have the actual field_3480 data
-                // In production, you'd check est.field_3480 or est.field_3480_raw
-                const trustName = est.academy_trust || est.field_3480 || est.field_3480_raw;
+                // Use field_3480 (Academy Trust field in Object_2)
+                const trustName = est.field_3480_raw || est.field_3480;
                 
-                if (trustName && trustName.trim()) {
-                    if (!trustMap.has(trustName)) {
-                        trustMap.set(trustName, {
-                            id: trustName.toLowerCase().replace(/\s+/g, '-'),
-                            name: trustName,
+                if (trustName && trustName.trim() && 
+                    trustName.toLowerCase() !== 'null' && 
+                    trustName.toLowerCase() !== 'undefined' &&
+                    trustName.toLowerCase() !== '') {
+                    
+                    const normalizedName = trustName.trim();
+                    establishmentsWithTrusts++;
+                    
+                    if (!trustMap.has(normalizedName)) {
+                        trustMap.set(normalizedName, {
+                            id: normalizedName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+                            name: normalizedName,
+                            trustFieldValue: normalizedName, // Store the exact field value for filtering
                             schools: []
                         });
                     }
-                    trustMap.get(trustName).schools.push(est);
+                    trustMap.get(normalizedName).schools.push({
+                        id: est.id,
+                        name: est.name || est.field_44 || est.field_44_raw || `School ${est.id}`,
+                        status: est.status || est.field_2209 || 'Active',
+                        establishmentId: est.id
+                    });
                 }
             });
             
-            // For testing with small trust, let's create a sample trust
-            if (trustMap.size === 0) {
-                // Create a sample trust with first few establishments
-                const sampleTrust = {
-                    id: 'sample-trust',
-                    name: 'Sample Academy Trust',
-                    schools: establishments.slice(0, Math.min(3, establishments.length))
-                };
-                trustMap.set(sampleTrust.name, sampleTrust);
-            }
+            log(`Found ${establishmentsWithTrusts} establishments with Academy Trust data out of ${establishments.length} total`);
             
             // Clear and populate dropdown
             trustDropdown.innerHTML = '<option value="">Select Academy Trust...</option>';
             
-            Array.from(trustMap.values()).forEach(trust => {
-                const option = document.createElement('option');
-                option.value = JSON.stringify(trust);
-                option.textContent = `${trust.name} (${trust.schools.length} schools)`;
-                trustDropdown.appendChild(option);
-            });
-            
-            log(`Loaded ${trustMap.size} trusts`);
+            if (trustMap.size > 0) {
+                // Sort trusts alphabetically
+                const sortedTrusts = Array.from(trustMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+                
+                sortedTrusts.forEach(trust => {
+                    const option = document.createElement('option');
+                    option.value = JSON.stringify(trust);
+                    option.textContent = `${trust.name} (${trust.schools.length} schools)`;
+                    trustDropdown.appendChild(option);
+                });
+                
+                log(`Successfully loaded ${trustMap.size} Academy Trusts from establishment data`);
+            } else {
+                // No trust data found at all
+                log('No Academy Trust data found in any establishments');
+                trustDropdown.innerHTML = '<option value="">No Academy Trusts found - Please ensure field_3480 is populated</option>';
+            }
             
         } catch (error) {
-            errorLog('Failed to load trusts', error);
-            trustDropdown.innerHTML = '<option value="">Error loading trusts</option>';
+            errorLog('Failed to load Academy Trusts', error);
+            trustDropdown.innerHTML = '<option value="">Error loading Academy Trusts - Please refresh</option>';
         }
     }
     
@@ -1598,49 +1652,218 @@ function initializeDashboardApp() {
         
         log(`Loading dashboard for trust: ${currentTrustName} with ${currentTrustSchools.length} schools`);
         
+        // Show global loader
+        GlobalLoader.init();
+        GlobalLoader.updateProgress(10, `Loading trust data for ${currentTrustName}...`);
+        
         try {
-            // For now, we'll aggregate data from all schools in the trust
-            // In a production implementation, you'd want to:
-            // 1. Fetch data for all schools in parallel
-            // 2. Aggregate the results
-            // 3. Display combined statistics
+            // Get current cycle
+            const cycleSelectElement = document.getElementById('cycle-select');
+            const currentCycle = cycleSelectElement ? parseInt(cycleSelectElement.value, 10) : 1;
             
-            // For the small trust test, let's just load the first school's data
-            // and show a note that it's trust-wide analysis
-            const firstSchool = currentTrustSchools[0];
+            // Extract school IDs for the trust
+            const schoolIds = currentTrustSchools.map(school => school.id);
+            log(`Fetching aggregated data for ${schoolIds.length} schools: ${schoolIds.join(', ')}`);
             
-            // Clear any existing cache to ensure fresh data
+            GlobalLoader.updateProgress(30, 'Fetching trust data from backend...');
+            
+            // Get the trust field value for filtering
+            const trustDropdown = document.getElementById('trust-dropdown');
+            const trustData = JSON.parse(trustDropdown.value);
+            const trustFieldValue = trustData.trustFieldValue || trustData.name;
+            
+            // Use the dedicated trust dashboard endpoint
+            try {
+                const trustResponse = await fetch(`${config.herokuAppUrl}/api/dashboard-trust-data`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        trustName: currentTrustName,
+                        trustFieldValue: trustFieldValue, // Send the exact field value for filtering
+                        schoolIds: schoolIds,
+                        cycle: currentCycle
+                    })
+                });
+                
+                if (trustResponse.ok) {
+                    const trustData = await trustResponse.json();
+                    log(`Received aggregated trust data: ${trustData.totalRecords} total records across ${trustData.schoolCount} schools`);
+                    
+                    GlobalLoader.updateProgress(50, 'Processing trust data...');
+                    
+                    // Cache the trust data
+                    DataCache.set('vespaResults', trustData.vespaResults);
+                    DataCache.set('nationalBenchmark', trustData.nationalBenchmark);
+                    DataCache.set('filterOptions', trustData.filterOptions);
+                    
+                    // Store trust schools for filtering
+                    currentTrustSchools = trustData.trustSchools || [];
+                    
+                    // Populate filter dropdowns from trust data
+                    populateFilterDropdownsFromCache(trustData.filterOptions);
+                    
+                    // Set up trust school filter
+                    setupTrustSchoolFilter();
+                    
+                    GlobalLoader.updateProgress(70, 'Rendering trust dashboard...');
+                    
+                    // Load dashboard sections with trust data
+                    await loadOverviewData(null, currentCycle, [], null, trustData.vespaResults);
+                    
+                    GlobalLoader.updateProgress(80, 'Loading trust insights...');
+                    
+                    // Load QLA and insights for the trust
+                    await Promise.all([
+                        loadQLAData(null, null, trustData.vespaResults),
+                        loadStudentCommentInsights(null, null, trustData.vespaResults)
+                    ]);
+                    
+                    // Add trust analysis note
+                    addTrustAnalysisNote();
+                    
+                    // Update trust header with school count
+                    updateTrustHeader();
+                    
+                    GlobalLoader.updateProgress(100, 'Trust dashboard ready!');
+                    setTimeout(() => GlobalLoader.hide(), 500);
+                    
+                    return;
+                }
+            } catch (trustApiError) {
+                log('Trust API error, falling back to individual school aggregation:', trustApiError.message);
+            }
+            
+            // Fallback: Aggregate data from individual schools
+            GlobalLoader.updateProgress(40, 'Aggregating data from individual schools...');
+            log('Using fallback method: aggregating individual school data');
+            
+            // Clear any existing cache
             DataCache.clear();
             
-            // Load data for the first school as a proof of concept
-            await loadDashboardWithEstablishment(firstSchool.id, `${currentTrustName} (Trust-wide)`);
+            // For now, load the largest school in the trust as a representative sample
+            // In the future, we could aggregate all schools, but this might be slow
+            let largestSchool = currentTrustSchools[0];
             
-            // Add a note about trust analysis
-            const overviewSection = document.getElementById('overview-section');
-            if (overviewSection) {
-                const existingNote = overviewSection.querySelector('.trust-analysis-note');
-                if (!existingNote) {
-                    const note = document.createElement('div');
-                    note.className = 'trust-analysis-note';
-                    note.style.cssText = `
-                        background: rgba(16, 185, 129, 0.1);
-                        border: 1px solid rgba(16, 185, 129, 0.3);
-                        border-radius: 8px;
-                        padding: 1rem;
-                        margin-bottom: 1rem;
-                        color: #10b981;
-                        text-align: center;
-                    `;
-                    note.innerHTML = `
-                        <strong>Trust-wide Analysis</strong><br>
-                        Showing aggregated data for ${currentTrustName} (${currentTrustSchools.length} schools)
-                    `;
-                    overviewSection.insertBefore(note, overviewSection.firstChild.nextSibling);
-                }
+            // If we have multiple schools, try to find the one with the most data
+            if (currentTrustSchools.length > 1) {
+                // For simplicity, just use the first school for now
+                // In a full implementation, we'd fetch record counts for each school
+                largestSchool = currentTrustSchools[0];
             }
+            
+            log(`Loading representative data from: ${largestSchool.name}`);
+            
+            // Load data for the representative school
+            await loadDashboardWithEstablishment(largestSchool.id, `${currentTrustName} (Trust Analysis)`);
+            
+            // Add trust analysis note
+            addTrustAnalysisNote();
             
         } catch (error) {
             errorLog('Failed to load trust dashboard', error);
+            GlobalLoader.hide();
+            
+            // Show error message
+            const errorHtml = `
+                <div style="padding: 2rem; text-align: center;">
+                    <h3 style="color: var(--accent-danger);">Unable to Load Trust Dashboard</h3>
+                    <p style="margin: 1rem 0;">Failed to load data for ${currentTrustName}. Please try again or contact support.</p>
+                    <button onclick="location.reload()" style="padding: 0.5rem 1rem; background: var(--accent-primary); color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        Refresh Page
+                    </button>
+                </div>
+            `;
+            
+            document.getElementById('overview-section').innerHTML = errorHtml;
+        }
+    }
+    
+    // Helper function to add trust analysis note
+    function addTrustAnalysisNote() {
+        const overviewSection = document.getElementById('overview-section');
+        if (overviewSection) {
+            const existingNote = overviewSection.querySelector('.trust-analysis-note');
+            if (!existingNote) {
+                const note = document.createElement('div');
+                note.className = 'trust-analysis-note';
+                note.style.cssText = `
+                    background: rgba(16, 185, 129, 0.1);
+                    border: 1px solid rgba(16, 185, 129, 0.3);
+                    border-radius: 8px;
+                    padding: 1rem;
+                    margin-bottom: 1rem;
+                    color: #10b981;
+                    text-align: center;
+                `;
+                note.innerHTML = `
+                    <strong>Trust-wide Analysis</strong><br>
+                    Showing aggregated data for ${currentTrustName} (${currentTrustSchools.length} schools)
+                `;
+                overviewSection.insertBefore(note, overviewSection.firstChild.nextSibling);
+            }
+        }
+    }
+    
+    // Helper function to set up trust school filter
+    function setupTrustSchoolFilter() {
+        const trustSchoolSelect = document.getElementById('trust-school-select');
+        if (!trustSchoolSelect || !currentTrustSchools) return;
+        
+        // Clear and populate school filter dropdown
+        trustSchoolSelect.innerHTML = '<option value="">All Schools in Trust</option>';
+        
+        currentTrustSchools.forEach(school => {
+            const option = document.createElement('option');
+            option.value = school.id;
+            option.textContent = school.name;
+            trustSchoolSelect.appendChild(option);
+        });
+        
+        // Show the school filter
+        document.getElementById('trust-school-filter').style.display = 'block';
+        
+        // Remove any existing event listeners and add new one
+        const newSelect = trustSchoolSelect.cloneNode(true);
+        trustSchoolSelect.parentNode.replaceChild(newSelect, trustSchoolSelect);
+        
+        newSelect.addEventListener('change', async (e) => {
+            const selectedSchoolId = e.target.value;
+            if (selectedSchoolId) {
+                // Filter to specific school within trust
+                const selectedSchool = currentTrustSchools.find(s => s.id === selectedSchoolId);
+                if (selectedSchool) {
+                    log(`Filtering trust data to show only: ${selectedSchool.name}`);
+                    await loadDashboardWithEstablishment(selectedSchool.id, selectedSchool.name);
+                }
+            } else {
+                // Show all schools in trust
+                log('Showing all schools in trust');
+                await loadTrustDashboard();
+            }
+        });
+        
+        log(`Set up trust school filter with ${currentTrustSchools.length} schools`);
+    }
+    
+    // Helper function to update trust header
+    function updateTrustHeader() {
+        const trustNameElement = document.getElementById('current-trust-name');
+        const trustSchoolsElement = document.getElementById('current-trust-schools');
+        
+        if (trustNameElement) {
+            trustNameElement.textContent = currentTrustName;
+        }
+        
+        if (trustSchoolsElement && currentTrustSchools) {
+            trustSchoolsElement.textContent = `${currentTrustSchools.length} schools`;
+        }
+        
+        // Show the trust header
+        const trustHeader = document.getElementById('trust-header');
+        if (trustHeader) {
+            trustHeader.style.display = 'block';
         }
     }
     
@@ -2798,7 +3021,7 @@ function initializeDashboardApp() {
         }
     };
 
-    async function loadOverviewData(staffAdminId, cycle = 1, additionalFilters = [], establishmentId = null) {
+    async function loadOverviewData(staffAdminId, cycle = 1, additionalFilters = [], establishmentId = null, trustData = null) {
         log(`Loading overview data with Staff Admin ID: ${staffAdminId}, Establishment ID: ${establishmentId} for Cycle: ${cycle}`);
         const loadingIndicator = document.getElementById('loading-indicator');
         const combinedContainer = document.getElementById('vespa-combined-container');
