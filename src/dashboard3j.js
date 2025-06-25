@@ -1718,6 +1718,10 @@ function initializeDashboardApp() {
                     // Load dashboard sections with trust data - pass the whole trustData object
                     await loadOverviewData(null, currentCycle, [], null, trustData);
                     
+                    // Store trust-wide averages for comparison
+                    DataCache.trustAverages = calculateSchoolVespaAverages(trustData.vespaResults, currentCycle);
+                    log("Stored trust-wide averages for comparison:", DataCache.trustAverages);
+                    
                     GlobalLoader.updateProgress(80, 'Loading trust insights...');
                     
                     // Load QLA and insights for the trust, passing the trust identifier
@@ -1791,14 +1795,17 @@ function initializeDashboardApp() {
     }
     
     // Helper function to add trust analysis note
-    function addTrustAnalysisNote() {
+    function addTrustAnalysisNote(schoolName = null) {
         const overviewSection = document.getElementById('overview-section');
         if (overviewSection) {
             const existingNote = overviewSection.querySelector('.trust-analysis-note');
-            if (!existingNote) {
-                const note = document.createElement('div');
-                note.className = 'trust-analysis-note';
-                note.style.cssText = `
+            if (existingNote) {
+                // Remove the existing note before adding a new one to prevent duplicates
+                existingNote.remove();
+            }
+            const note = document.createElement('div');
+            note.className = 'trust-analysis-note';
+            note.style.cssText = `
                     background: rgba(16, 185, 129, 0.1);
                     border: 1px solid rgba(16, 185, 129, 0.3);
                     border-radius: 8px;
@@ -1807,12 +1814,19 @@ function initializeDashboardApp() {
                     color: #10b981;
                     text-align: center;
                 `;
+            
+            if (schoolName) {
+                 note.innerHTML = `
+                    <strong>Trust-wide Analysis</strong><br>
+                    Viewing <strong>${schoolName}</strong> (compared against ${currentTrustName})
+                `;
+            } else {
                 note.innerHTML = `
                     <strong>Trust-wide Analysis</strong><br>
                     Showing aggregated data for ${currentTrustName} (${currentTrustSchools.length} schools)
                 `;
-                overviewSection.insertBefore(note, overviewSection.firstChild.nextSibling);
             }
+            overviewSection.insertBefore(note, overviewSection.firstChild.nextSibling);
         }
     }
     
@@ -1845,7 +1859,7 @@ function initializeDashboardApp() {
                 const selectedSchool = currentTrustSchools.find(s => s.id === selectedSchoolId);
                 if (selectedSchool) {
                     log(`Filtering trust data to show only: ${selectedSchool.name}`);
-                    await loadDashboardWithEstablishment(selectedSchool.id, selectedSchool.name);
+                    await loadSchoolInTrustView(selectedSchool.id, selectedSchool.name);
                 }
             } else {
                 // Show all schools in trust
@@ -1855,6 +1869,48 @@ function initializeDashboardApp() {
         });
         
         log(`Set up trust school filter with ${currentTrustSchools.length} schools`);
+    }
+    
+    async function loadSchoolInTrustView(schoolId, schoolName) {
+        log(`Loading school-in-trust view for: ${schoolName} (${schoolId})`);
+        
+        // Show global loader
+        GlobalLoader.init();
+        GlobalLoader.updateProgress(10, `Loading data for ${schoolName}...`);
+        
+        try {
+            // Fetch data for the specific school
+            const cycleSelectElement = document.getElementById('cycle-select');
+            const currentCycle = cycleSelectElement ? parseInt(cycleSelectElement.value, 10) : 1;
+            
+            // Re-use the batch data fetching for a single establishment
+            const batchData = await fetchDashboardInitialData(null, schoolId, currentCycle);
+            
+            // We have the school's data, now render it against the cached trust data
+            const schoolAverages = calculateSchoolVespaAverages(batchData.vespaResults, currentCycle);
+            const trustAverages = DataCache.trustAverages; // Use the cached trust averages
+            
+            log("School Averages:", schoolAverages);
+            log("Trust Averages (for comparison):", trustAverages);
+            
+            // Render the charts with a custom comparison label
+            renderAveragesChart(schoolAverages, trustAverages, currentCycle, 'Trust Avg');
+            renderDistributionCharts(batchData.vespaResults, trustAverages, themeColors, currentCycle, null, 'Trust Avg'); // Pass trust averages as comparison
+            
+            // Update other sections for the single school
+            await loadQLAData(null, schoolId);
+            await loadStudentCommentInsights(null, schoolId);
+            
+            // Update the analysis note
+            addTrustAnalysisNote(schoolName);
+            
+            GlobalLoader.updateProgress(100, 'School view ready!');
+            setTimeout(() => GlobalLoader.hide(), 500);
+            
+        } catch (error) {
+            errorLog('Failed to load school-in-trust view', error);
+            GlobalLoader.hide();
+        }
     }
     
     // Helper function to update trust header
@@ -3394,7 +3450,7 @@ function initializeDashboardApp() {
         return nationalAverages;
     }
 
-    function renderAveragesChart(schoolData, nationalData, cycle) {
+    function renderAveragesChart(schoolData, comparisonData, cycle, comparisonLabel = 'Global') {
         // Note: This function now only creates the score cards
         // The distribution charts will be created after this function is called
         const container = document.getElementById('vespa-combined-container');
@@ -3403,7 +3459,7 @@ function initializeDashboardApp() {
             return;
         }
 
-        log(`Creating score cards for Cycle ${cycle}. School:`, schoolData, "Global:", nationalData);
+        log(`Creating score cards for Cycle ${cycle}. School:`, schoolData, "Global:", comparisonData);
 
         // Store VESPA scores globally for report generation
         currentVespaScores = {};
@@ -3412,9 +3468,9 @@ function initializeDashboardApp() {
                 currentVespaScores[key] = schoolData[key];
             }
         });
-        Object.keys(nationalData).forEach(key => {
-            if (typeof nationalData[key] === 'number') {
-                currentVespaScores[`${key}National`] = nationalData[key];
+        Object.keys(comparisonData).forEach(key => {
+            if (typeof comparisonData[key] === 'number') {
+                currentVespaScores[`${key}National`] = comparisonData[key];
             }
         });
         log('Stored VESPA scores globally:', currentVespaScores);
@@ -3441,7 +3497,7 @@ function initializeDashboardApp() {
 
         elementsToDisplay.forEach(element => {
             const schoolScore = schoolData[element.key];
-            const nationalScore = nationalData[element.key];
+            const nationalScore = comparisonData[element.key];
 
             const card = document.createElement('div');
             card.className = 'vespa-score-card';
@@ -3477,7 +3533,7 @@ function initializeDashboardApp() {
                 <h3>${element.name}</h3>
                 <div class="score-value">${scoreToDisplay}</div>
                 <div class="national-comparison">
-                    Global: ${nationalScoreToDisplay} <span class="arrow ${arrowClass}">${arrow}</span> ${percentageDiffText}
+                    ${comparisonLabel}: ${nationalScoreToDisplay} <span class="arrow ${arrowClass}">${arrow}</span> ${percentageDiffText}
                 </div>
             `;
             
@@ -4525,7 +4581,8 @@ function initializeDashboardApp() {
                 chartData.color,
                 cycle,
                 chartData.key,
-                nationalDistributions
+                nationalDistributions,
+                chartData.comparisonLabel
             );
         });
         
@@ -4541,7 +4598,7 @@ function initializeDashboardApp() {
         log("Combined VESPA display rendered successfully");
     }
 
-    function renderDistributionCharts(schoolResults, nationalAveragesData, themeColorsConfig, cycle, nationalDistributions) {
+    function renderDistributionCharts(schoolResults, comparisonAverages, themeColorsConfig, cycle, nationalDistributions, comparisonLabel = 'Global') {
         log(`Creating distribution charts for Cycle ${cycle}.`);
 
         // VESPA elements and their corresponding field prefixes in Object_10 for historical data
@@ -4571,11 +4628,11 @@ function initializeDashboardApp() {
                 });
             }
             
-            const nationalAverageForElement = nationalAveragesData ? nationalAveragesData[element.key] : null;
+            const nationalAverageForElement = comparisonAverages ? comparisonAverages[element.key] : null;
             const canvasId = `${element.key}-distribution-chart`;
             let chartTitle = `${element.name} Score Distribution - Cycle ${cycle}`;
 
-            log(`For ${element.name} Distribution - National Avg: ${nationalAverageForElement}`);
+            log(`For ${element.name} Distribution - ${comparisonLabel} Avg: ${nationalAverageForElement}`);
 
             // Create chart wrapper element
             const chartWrapper = document.createElement('div');
@@ -4594,7 +4651,8 @@ function initializeDashboardApp() {
                 nationalAverage: nationalAverageForElement,
                 color: element.color,
                 title: chartTitle,
-                key: element.key
+                key: element.key,
+                comparisonLabel: comparisonLabel
             };
         });
         
@@ -4602,7 +4660,7 @@ function initializeDashboardApp() {
         renderCombinedVespaDisplay(cycle, nationalDistributions);
     }
 
-    function createSingleHistogram(canvasId, title, schoolScoreDistribution, nationalAverageScore, color, cycle, elementKey, nationalDistributions) {
+    function createSingleHistogram(canvasId, title, schoolScoreDistribution, nationalAverageScore, color, cycle, elementKey, nationalDistributions, comparisonLabel = 'Global') {
         const canvas = document.getElementById(canvasId);
         if (!canvas) {
             errorLog(`Canvas element ${canvasId} not found for histogram.`);
@@ -4813,7 +4871,7 @@ function initializeDashboardApp() {
                 borderDash: [8, 4], // Dashed line
                 label: {
                     enabled: true,
-                    content: `Global Avg: ${nationalAverageScore.toFixed(1)}`,
+                    content: `${comparisonLabel} Avg: ${nationalAverageScore.toFixed(1)}`,
                     position: 'start',
                     backgroundColor: 'rgba(255, 217, 61, 0.9)',
                     font: { 
@@ -4826,7 +4884,7 @@ function initializeDashboardApp() {
             };
         } else if (nationalAverageScore !== null && typeof nationalAverageScore !== 'undefined') {
             // Fallback: add to title if annotation plugin is not available
-            chartConfig.options.plugins.title.text += ` (Global Avg: ${nationalAverageScore.toFixed(2)})`;
+            chartConfig.options.plugins.title.text += ` (${comparisonLabel} Avg: ${nationalAverageScore.toFixed(2)})`;
         }
 
         log(`Creating histogram for ${canvasId} with title: '${chartConfig.options.plugins.title.text}'`); // Log final title
