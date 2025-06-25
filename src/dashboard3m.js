@@ -922,6 +922,166 @@ function initializeDashboardApp() {
                 background: var(--card-bg);
                 color: var(--text-primary);
             }
+            
+            /* Theme Analysis Pending Styles */
+            .theme-analysis-pending {
+                background: rgba(255, 255, 255, 0.05);
+                border: 2px dashed rgba(59, 130, 246, 0.3);
+                border-radius: 12px;
+                padding: 2rem;
+                text-align: center;
+            }
+            
+            .theme-analysis-pending h3 {
+                color: #3b82f6;
+                margin-bottom: 1rem;
+                font-size: 1.25rem;
+            }
+            
+            .config-message {
+                color: #a8b2d1;
+                line-height: 1.6;
+            }
+            
+            .config-message strong {
+                color: #ffffff;
+            }
+            
+            .setup-note {
+                margin-top: 1rem;
+                font-size: 0.9rem;
+                color: #f59e0b;
+                font-style: italic;
+            }
+            
+            /* Theme Cards Styles */
+            .themes-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                gap: 1.5rem;
+                margin-top: 1rem;
+            }
+            
+            .theme-card {
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 12px;
+                padding: 1.5rem;
+                transition: all 0.3s ease;
+            }
+            
+            .theme-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+            }
+            
+            .theme-card h4 {
+                margin: 0 0 0.5rem 0;
+                color: #ffffff;
+                font-size: 1.1rem;
+            }
+            
+            .theme-count {
+                font-size: 0.9rem;
+                color: #a8b2d1;
+                margin-bottom: 1rem;
+                font-weight: 600;
+            }
+            
+            .theme-examples {
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                padding-top: 1rem;
+                margin-top: 1rem;
+            }
+            
+            .theme-examples p {
+                margin: 0.5rem 0;
+                font-size: 0.9rem;
+                color: #e2e8f0;
+                font-style: italic;
+                line-height: 1.4;
+            }
+            
+            /* Sentiment-based theme card colors */
+            .theme-card.positive {
+                border-color: rgba(16, 185, 129, 0.3);
+                background: rgba(16, 185, 129, 0.1);
+            }
+            
+            .theme-card.positive:hover {
+                border-color: rgba(16, 185, 129, 0.5);
+            }
+            
+            .theme-card.negative {
+                border-color: rgba(239, 68, 68, 0.3);
+                background: rgba(239, 68, 68, 0.1);
+            }
+            
+            .theme-card.negative:hover {
+                border-color: rgba(239, 68, 68, 0.5);
+            }
+            
+            .theme-card.mixed {
+                border-color: rgba(251, 191, 36, 0.3);
+                background: rgba(251, 191, 36, 0.1);
+            }
+            
+            .theme-card.mixed:hover {
+                border-color: rgba(251, 191, 36, 0.5);
+            }
+            
+            /* Theme Loading State */
+            .themes-loading {
+                text-align: center;
+                padding: 2rem;
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 12px;
+            }
+            
+            .themes-loading h3 {
+                color: #3b82f6;
+                margin-bottom: 1.5rem;
+            }
+            
+            .themes-loading .loading-content {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 1rem;
+            }
+            
+            .themes-loading .spinner {
+                width: 40px;
+                height: 40px;
+                border: 3px solid rgba(59, 130, 246, 0.2);
+                border-top: 3px solid #3b82f6;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+            }
+            
+            .themes-loading p {
+                color: #a8b2d1;
+                margin: 0;
+            }
+            
+            .themes-loading .loading-note {
+                font-size: 0.9rem;
+                color: #64748b;
+                font-style: italic;
+            }
+            
+            /* Theme Keywords */
+            .theme-keyword {
+                display: inline-block;
+                padding: 0.25rem 0.75rem;
+                margin: 0.25rem;
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 20px;
+                font-size: 0.9rem;
+                color: #e2e8f0;
+            }
         `;
         document.head.appendChild(style);
         
@@ -2124,7 +2284,9 @@ function initializeDashboardApp() {
                     DataCache.clear();
                     
                     const activeFilters = getActiveFilters();
-                    await loadOverviewData(null, selectedCycle, activeFilters, establishmentId);
+                    
+                    // Reload all dashboard sections, not just overview
+                    await loadDashboardWithEstablishment(establishmentId, establishmentName, selectedCycle, activeFilters);
                 });
             }
             
@@ -2163,7 +2325,25 @@ function initializeDashboardApp() {
                     parseInt(document.getElementById('cycle-select').value, 10) : 1;
                 const activeFilters = getActiveFilters();
                 log("Applying filters:", activeFilters);
-                loadOverviewData(null, selectedCycle, activeFilters, establishmentId);
+
+                if (currentAnalysisType === 'trust') {
+                    const selectedSchoolId = document.getElementById('trust-school-select')?.value;
+                    if (selectedSchoolId) {
+                        const schoolName = document.getElementById('trust-school-select').selectedOptions[0].text;
+                        loadSchoolInTrustView(selectedSchoolId, schoolName, activeFilters);
+                    } else {
+                        // Re-load the whole trust dashboard with filters
+                        loadTrustDashboard(activeFilters); 
+                    }
+                } else if (isSuperUser && currentEstablishmentId) {
+                    // When in super user mode for a single establishment, reload everything
+                    loadDashboardWithEstablishment(currentEstablishmentId, selectedEstablishmentName, selectedCycle, activeFilters);
+                } else if (currentStaffAdminId) {
+                    // For a normal user, reload all sections with filters
+                    loadOverviewData(currentStaffAdminId, selectedCycle, activeFilters);
+                    loadQLAData(currentStaffAdminId, null, null, activeFilters);
+                    loadStudentCommentInsights(currentStaffAdminId, null, null, activeFilters);
+                }
             });
         }
         
@@ -2186,8 +2366,23 @@ function initializeDashboardApp() {
                 // Reload data without filters
                 const selectedCycle = document.getElementById('cycle-select') ? 
                     parseInt(document.getElementById('cycle-select').value, 10) : 1;
-                log("Clearing all filters");
-                loadOverviewData(null, selectedCycle, [], establishmentId);
+                
+                if (currentAnalysisType === 'trust') {
+                    const selectedSchoolId = document.getElementById('trust-school-select')?.value;
+                    if (selectedSchoolId) {
+                        const schoolName = document.getElementById('trust-school-select').selectedOptions[0].text;
+                        loadSchoolInTrustView(selectedSchoolId, schoolName, []);
+                    } else {
+                        loadTrustDashboard([]);
+                    }
+                } else if (isSuperUser && currentEstablishmentId) {
+                    loadDashboardWithEstablishment(currentEstablishmentId, selectedEstablishmentName, selectedCycle, []);
+                } else {
+                    log("Clearing all filters");
+                    loadOverviewData(currentStaffAdminId, selectedCycle, []);
+                    loadQLAData(currentStaffAdminId, null, null, []);
+                    loadStudentCommentInsights(currentStaffAdminId, null, null, []);
+                }
             });
         }
     }
@@ -4900,8 +5095,8 @@ function initializeDashboardApp() {
     let allQuestionResponses = []; // Cache for QLA data
     let questionMappings = { id_to_text: {}, psychometric_details: {} }; // Cache for mappings
 
-    async function loadQLAData(staffAdminId, establishmentId = null, trustIdentifier = null) {
-        log(`Loading QLA data with Staff Admin ID: ${staffAdminId}, Establishment ID: ${establishmentId}`);
+    async function loadQLAData(staffAdminId, establishmentId = null, trustIdentifier = null, filters = []) {
+        log(`Loading QLA data with Staff Admin ID: ${staffAdminId}, Establishment ID: ${establishmentId}, Filters:`, filters);
         try {
             // Fetch question mappings first
             try {
@@ -4923,6 +5118,8 @@ function initializeDashboardApp() {
             if (trustIdentifier && trustIdentifier.trustFieldValue) {
                 filterPayload.trustFieldValue = trustIdentifier.trustFieldValue;
             }
+            // Append main dashboard filters to the request
+            filterPayload.additionalFilters = filters;
 
             try {
                 // Get top/bottom questions
@@ -5624,18 +5821,20 @@ function initializeDashboardApp() {
 
 
     // --- Section 3: Student Comment Insights ---
-    async function loadStudentCommentInsights(staffAdminId, establishmentId = null, trustIdentifier = null) {
-        log(`Loading student comment insights with Staff Admin ID: ${staffAdminId}, Establishment ID: ${establishmentId}`);
+    async function loadStudentCommentInsights(staffAdminId, establishmentId = null, trustIdentifier = null, filters = []) {
+        log(`Loading student comment insights with Staff Admin ID: ${staffAdminId}, Establishment ID: ${establishmentId}, Filters:`, filters);
         try {
             // Prepare filters for comment analysis
-            const filters = {};
+            const requestFilters = {};
             if (establishmentId) {
-                filters.establishmentId = establishmentId;
+                requestFilters.establishmentId = establishmentId;
             } else if (staffAdminId) {
-                filters.staffAdminId = staffAdminId;
+                requestFilters.staffAdminId = staffAdminId;
             } else if (trustIdentifier && trustIdentifier.trustFieldValue) {
-                filters.trustFieldValue = trustIdentifier.trustFieldValue;
+                requestFilters.trustFieldValue = trustIdentifier.trustFieldValue;
             }
+            // Append main dashboard filters to the request
+            requestFilters.additionalFilters = filters;
             
             // Define comment fields to analyze
             const commentFields = [
@@ -5654,7 +5853,7 @@ function initializeDashboardApp() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         commentFields: commentFields,
-                        filters: filters
+                        filters: requestFilters
                     })
                 });
                 
@@ -5667,22 +5866,85 @@ function initializeDashboardApp() {
             }
             
             // Fetch theme analysis
+            const themesContainer = document.getElementById('common-themes-container');
+            if (themesContainer) {
+                // Show loading state for themes
+                themesContainer.innerHTML = `
+                    <div class="themes-loading">
+                        <h3>Theme Analysis</h3>
+                        <div class="loading-content">
+                            <div class="spinner"></div>
+                            <p>Analyzing comments with AI...</p>
+                            <p class="loading-note">This may take up to 30 seconds</p>
+                        </div>
+                    </div>
+                `;
+            }
+            
             try {
-                const themesResponse = await fetch(`${config.herokuAppUrl}/api/comment-themes`, {
+                log(`Fetching theme analysis for ${commentFields.length} comment fields...`);
+                
+                // Create fetch options with optional timeout
+                const fetchOptions = {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         commentFields: commentFields,
-                        filters: filters
+                        filters: requestFilters
                     })
-                });
+                };
+                
+                // Add timeout if supported
+                if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) {
+                    fetchOptions.signal = AbortSignal.timeout(25000); // 25 second timeout
+                }
+                
+                // Try the fast word-cloud based theme analysis first
+                let endpoint = '/api/comment-themes-fast';
+                
+                // Check if we should use the original endpoint (for backwards compatibility)
+                const useFastThemes = true; // Set to false to use original method
+                
+                if (!useFastThemes) {
+                    endpoint = '/api/comment-themes';
+                }
+                
+                const themesResponse = await fetch(`${config.herokuAppUrl}${endpoint}`, fetchOptions);
                 
                 if (themesResponse.ok) {
                     const themesData = await themesResponse.json();
+                    log("Theme analysis response:", themesData);
                     renderThemes(themesData);
+                } else {
+                    // Handle non-ok responses
+                    const errorText = await themesResponse.text();
+                    errorLog(`Theme analysis failed with status ${themesResponse.status}:`, errorText);
+                    
+                    // Try to parse as JSON to get error message
+                    let errorData = { message: errorText };
+                    try {
+                        errorData = JSON.parse(errorText);
+                    } catch (e) {
+                        // Not JSON, use text as-is
+                    }
+                    
+                    // Still render to show the error to user
+                    renderThemes({
+                        themes: [],
+                        totalThemes: 0,
+                        totalComments: 0,
+                        message: errorData.message || `Theme analysis failed: ${themesResponse.status}`
+                    });
                 }
             } catch (error) {
                 errorLog("Failed to fetch themes data", error);
+                // Show error to user
+                renderThemes({
+                    themes: [],
+                    totalThemes: 0,
+                    totalComments: 0,
+                    message: `Error connecting to theme analysis: ${error.message}`
+                });
             }
 
         } catch (error) {
@@ -5780,7 +6042,21 @@ function initializeDashboardApp() {
         // Handle empty data or messages
         if (!data || !data.themes || data.themes.length === 0) {
             const message = data?.message || 'No themes available for analysis.';
-            container.innerHTML = `<p class="no-data-message">${message}</p>`;
+            // Check if it's specifically the OpenAI configuration issue
+            if (message.includes('OpenAI API configuration')) {
+                container.innerHTML = `
+                    <div class="theme-analysis-pending">
+                        <h3>Theme Analysis</h3>
+                        <div class="config-message">
+                            <p><strong>Configuration Required:</strong> Theme analysis uses AI to automatically identify patterns in student comments.</p>
+                            <p>Found <strong>${data?.totalComments || 0} comments</strong> ready to analyze.</p>
+                            <p class="setup-note">To enable this feature, please configure the OpenAI API key in your backend settings.</p>
+                        </div>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `<p class="no-data-message">${message}</p>`;
+            }
             return;
         }
         
@@ -5792,7 +6068,16 @@ function initializeDashboardApp() {
                         <h4>${theme.theme}</h4>
                         <div class="theme-count">${theme.count} mentions</div>
                         <div class="theme-examples">
-                            ${theme.examples.map(ex => `<p>"${ex}"</p>`).join('')}
+                            ${theme.examples.map(ex => {
+                                // Handle both quote format and keyword format
+                                if (ex.startsWith('"') || ex.length > 50) {
+                                    // It's a quote
+                                    return `<p>${ex.startsWith('"') ? ex : `"${ex}"`}</p>`;
+                                } else {
+                                    // It's a keyword
+                                    return `<span class="theme-keyword">${ex}</span>`;
+                                }
+                            }).join('')}
                         </div>
                     </div>
                 `).join('')}
