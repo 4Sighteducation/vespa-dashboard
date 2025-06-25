@@ -1674,18 +1674,24 @@ function initializeDashboardApp() {
             
             // Use the dedicated trust dashboard endpoint
             try {
+                const requestBody = {
+                    trustName: currentTrustName,
+                    trustFieldValue: trustFieldValue, // Send the exact field value for filtering
+                    schoolIds: schoolIds,
+                    cycle: currentCycle
+                };
+                
+                log('Trust dashboard request body:', requestBody);
+                
                 const trustResponse = await fetch(`${config.herokuAppUrl}/api/dashboard-trust-data`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        trustName: currentTrustName,
-                        trustFieldValue: trustFieldValue, // Send the exact field value for filtering
-                        schoolIds: schoolIds,
-                        cycle: currentCycle
-                    })
+                    body: JSON.stringify(requestBody)
                 });
+                
+                log('Trust dashboard response status:', trustResponse.status);
                 
                 if (trustResponse.ok) {
                     const trustData = await trustResponse.json();
@@ -1716,8 +1722,8 @@ function initializeDashboardApp() {
                     
                     // Load QLA and insights for the trust
                     await Promise.all([
-                        loadQLAData(null, null, trustData.vespaResults),
-                        loadStudentCommentInsights(null, null, trustData.vespaResults)
+                        loadQLAData(null, null),
+                        loadStudentCommentInsights(null, null)
                     ]);
                     
                     // Add trust analysis note
@@ -1730,9 +1736,12 @@ function initializeDashboardApp() {
                     setTimeout(() => GlobalLoader.hide(), 500);
                     
                     return;
+                } else {
+                    const errorText = await trustResponse.text();
+                    log('Trust dashboard response error:', trustResponse.status, errorText);
                 }
             } catch (trustApiError) {
-                log('Trust API error, falling back to individual school aggregation:', trustApiError.message);
+                errorLog('Trust API error, falling back to individual school aggregation:', trustApiError);
             }
             
             // Fallback: Aggregate data from individual schools
