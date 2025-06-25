@@ -3359,15 +3359,34 @@ body.knack-body .kn-content {
 
 /* Trust School Filter */
 .trust-school-filter {
+    display: flex;
+    gap: 15px;
+    align-items: center;
     margin-bottom: 1rem;
+    margin-top: 1rem;
+}
+
+.trust-school-filter label {
+    color: #a8b2d1;
+    font-weight: 600;
+    font-size: 14px;
 }
 
 .trust-school-filter select {
-    padding: 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    background: var(--card-bg);
-    color: var(--text-primary);
+    padding: 10px 15px;
+    border: 2px solid rgba(16, 185, 129, 0.4);
+    background: rgba(0, 0, 0, 0.5);
+    color: #ffffff;
+    border-radius: 8px;
+    font-size: 14px;
+    min-width: 250px;
+    transition: all 0.3s ease;
+}
+
+.trust-school-filter select:focus {
+    outline: none;
+    border-color: var(--accent-success);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
 }
 
 /* Trust Analysis Note */
@@ -3418,5 +3437,3 @@ body.knack-body .kn-content {
         display: none !important;
     }
 }
-
-
