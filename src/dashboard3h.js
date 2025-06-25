@@ -1720,10 +1720,11 @@ function initializeDashboardApp() {
                     
                     GlobalLoader.updateProgress(80, 'Loading trust insights...');
                     
-                    // Load QLA and insights for the trust
+                    // Load QLA and insights for the trust, passing the trust identifier
+                    const trustIdentifier = { trustFieldValue: trustFieldValue };
                     await Promise.all([
-                        loadQLAData(null, null),
-                        loadStudentCommentInsights(null, null)
+                        loadQLAData(null, null, trustIdentifier),
+                        loadStudentCommentInsights(null, null, trustIdentifier)
                     ]);
                     
                     // Add trust analysis note
@@ -4835,7 +4836,7 @@ function initializeDashboardApp() {
     let allQuestionResponses = []; // Cache for QLA data
     let questionMappings = { id_to_text: {}, psychometric_details: {} }; // Cache for mappings
 
-    async function loadQLAData(staffAdminId, establishmentId = null) {
+    async function loadQLAData(staffAdminId, establishmentId = null, trustIdentifier = null) {
         log(`Loading QLA data with Staff Admin ID: ${staffAdminId}, Establishment ID: ${establishmentId}`);
         try {
             // Fetch question mappings first
@@ -4855,6 +4856,9 @@ function initializeDashboardApp() {
             const filterPayload = {};
             if (establishmentId) filterPayload.establishmentId = establishmentId;
             if (staffAdminId) filterPayload.staffAdminId = staffAdminId;
+            if (trustIdentifier && trustIdentifier.trustFieldValue) {
+                filterPayload.trustFieldValue = trustIdentifier.trustFieldValue;
+            }
 
             try {
                 // Get top/bottom questions
@@ -5556,7 +5560,7 @@ function initializeDashboardApp() {
 
 
     // --- Section 3: Student Comment Insights ---
-    async function loadStudentCommentInsights(staffAdminId, establishmentId = null) {
+    async function loadStudentCommentInsights(staffAdminId, establishmentId = null, trustIdentifier = null) {
         log(`Loading student comment insights with Staff Admin ID: ${staffAdminId}, Establishment ID: ${establishmentId}`);
         try {
             // Prepare filters for comment analysis
@@ -5565,6 +5569,8 @@ function initializeDashboardApp() {
                 filters.establishmentId = establishmentId;
             } else if (staffAdminId) {
                 filters.staffAdminId = staffAdminId;
+            } else if (trustIdentifier && trustIdentifier.trustFieldValue) {
+                filters.trustFieldValue = trustIdentifier.trustFieldValue;
             }
             
             // Define comment fields to analyze
