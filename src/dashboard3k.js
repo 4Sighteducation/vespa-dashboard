@@ -1466,8 +1466,9 @@ function initializeDashboardApp() {
             document.getElementById('current-trust-name').textContent = currentTrustName;
             document.getElementById('establishment-controls').style.display = 'none';
             
-            // Load trust schools and show trust-specific filter
-            await loadTrustSchools(trustData.id);
+            // The call to loadTrustSchools here is redundant and was causing errors.
+            // The main loadTrustDashboard function handles setting up the school filter correctly.
+            // await loadTrustSchools(trustData.id); 
         }
         
         hideAnalysisTypeModal();
