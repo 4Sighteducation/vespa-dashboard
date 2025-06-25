@@ -1715,8 +1715,8 @@ function initializeDashboardApp() {
                     
                     GlobalLoader.updateProgress(70, 'Rendering trust dashboard...');
                     
-                    // Load dashboard sections with trust data
-                    await loadOverviewData(null, currentCycle, [], null, trustData.vespaResults);
+                    // Load dashboard sections with trust data - pass the whole trustData object
+                    await loadOverviewData(null, currentCycle, [], null, trustData);
                     
                     GlobalLoader.updateProgress(80, 'Loading trust insights...');
                     
@@ -3031,7 +3031,7 @@ function initializeDashboardApp() {
         }
     };
 
-    async function loadOverviewData(staffAdminId, cycle = 1, additionalFilters = [], establishmentId = null, trustData = null) {
+    async function loadOverviewData(staffAdminId, cycle = 1, additionalFilters = [], establishmentId = null, preloadedData = null) {
         log(`Loading overview data with Staff Admin ID: ${staffAdminId}, Establishment ID: ${establishmentId} for Cycle: ${cycle}`);
         const loadingIndicator = document.getElementById('loading-indicator');
         const combinedContainer = document.getElementById('vespa-combined-container');
@@ -3040,20 +3040,26 @@ function initializeDashboardApp() {
         if (combinedContainer) combinedContainer.style.display = 'none'; // Hide while loading
 
         try {
-            // Check if we need to fetch new data or can use cached
             let batchData;
-            const cachedData = DataCache.get('initialData');
-            
-            // Only fetch new data if cache is invalid or cycle changed
-            if (!cachedData || cachedData.cycle !== cycle || 
-                cachedData.staffAdminId !== staffAdminId || 
-                cachedData.establishmentId !== establishmentId) {
-                GlobalLoader.updateProgress(40, 'Loading dashboard data...');
-                batchData = await fetchDashboardInitialData(staffAdminId, establishmentId, cycle);
+
+            // If data is preloaded (i.e., for a trust), use it directly
+            if (preloadedData) {
+                log("Using preloaded data for overview (trust view)");
+                batchData = preloadedData;
+                GlobalLoader.updateProgress(50, 'Processing aggregated trust data...');
             } else {
-                log("Using cached data for overview");
-                batchData = cachedData;
-                GlobalLoader.updateProgress(50, 'Processing cached data...');
+                // Otherwise, fetch data as usual
+                const cachedData = DataCache.get('initialData');
+                if (!cachedData || cachedData.cycle !== cycle || 
+                    cachedData.staffAdminId !== staffAdminId || 
+                    cachedData.establishmentId !== establishmentId) {
+                    GlobalLoader.updateProgress(40, 'Loading dashboard data...');
+                    batchData = await fetchDashboardInitialData(staffAdminId, establishmentId, cycle);
+                } else {
+                    log("Using cached data for overview");
+                    batchData = cachedData;
+                    GlobalLoader.updateProgress(50, 'Processing cached data...');
+                }
             }
             
             let schoolVespaResults = batchData.vespaResults || [];
