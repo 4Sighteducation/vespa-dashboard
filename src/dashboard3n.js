@@ -2229,13 +2229,76 @@ function initializeDashboardApp() {
             GlobalLoader.updateProgress(30, 'Fetching dashboard data...');
             
             try {
-                // Pass null for staffAdminId since we're in Super User mode
-                const batchData = await fetchDashboardInitialData(null, establishmentId, initialCycle);
+                // First check the size of the dataset
+                const sizeCheckUrl = `${config.herokuAppUrl}/api/knack-data?objectKey=object_10&filters=${encodeURIComponent(JSON.stringify([{field: 'field_133', operator: 'is', value: establishmentId}]))}&rows_per_page=1`;
+                const sizeResponse = await fetch(sizeCheckUrl);
+                const sizeData = await sizeResponse.json();
+                const totalRecords = sizeData.records ? sizeData.total_records || sizeData.records.length : 0;
                 
-                // Check if we're in limited mode
-                if (batchData.isLimitedMode) {
-                    log(`Limited mode active: ${batchData.loadedRecords} of ${batchData.totalRecords} records loaded`);
-                    GlobalLoader.updateProgress(40, `Loading limited dataset (${batchData.loadedRecords} records)...`);
+                let batchData;
+                
+                // Use optimized endpoint for datasets over 2000 records
+                if (totalRecords > 2000) {
+                    log(`Large dataset detected (${totalRecords} records), using optimized loading`);
+                    GlobalLoader.updateProgress(30, `Large dataset detected: ${totalRecords} records. Loading optimized...`);
+                    
+                    const optimizedData = await fetchDashboardDataOptimized(establishmentId, initialCycle);
+                    
+                    // Also fetch national benchmark and other data
+                    const nationalResponse = await fetch(`${config.herokuAppUrl}/api/knack-data?objectKey=object_120&rows_per_page=1&sort_field=field_3307&sort_order=desc`);
+                    const nationalData = await nationalResponse.json();
+                    
+                    // Build filter options from the loaded data
+                    const filterOptions = {
+                        groups: [],
+                        courses: [],
+                        yearGroups: [],
+                        faculties: []
+                    };
+                    
+                    const groupsSet = new Set();
+                    const coursesSet = new Set();
+                    const yearGroupsSet = new Set();
+                    const facultiesSet = new Set();
+                    
+                    optimizedData.vespaResults.forEach(record => {
+                        const group = record.field_223_raw || record.field_223;
+                        if (group) groupsSet.add(group);
+                        
+                        const course = record.field_2299_raw || record.field_2299;
+                        if (course) coursesSet.add(course);
+                        
+                        if (record.field_144_raw) yearGroupsSet.add(record.field_144_raw);
+                        if (record.field_782_raw) facultiesSet.add(record.field_782_raw);
+                    });
+                    
+                    filterOptions.groups = Array.from(groupsSet).sort();
+                    filterOptions.courses = Array.from(coursesSet).sort();
+                    filterOptions.yearGroups = Array.from(yearGroupsSet).sort();
+                    filterOptions.faculties = Array.from(facultiesSet).sort();
+                    
+                    batchData = {
+                        vespaResults: optimizedData.vespaResults,
+                        nationalBenchmark: nationalData.records && nationalData.records[0] ? nationalData.records[0] : {},
+                        filterOptions: filterOptions,
+                        totalRecords: optimizedData.totalRecords,
+                        isOptimizedLoad: true
+                    };
+                    
+                    // Cache the results
+                    DataCache.set('vespaResults', batchData.vespaResults);
+                    DataCache.set('nationalBenchmark', batchData.nationalBenchmark);
+                    DataCache.set('filterOptions', batchData.filterOptions);
+                    
+                } else {
+                    // Use regular endpoint for smaller datasets
+                    batchData = await fetchDashboardInitialData(null, establishmentId, initialCycle);
+                    
+                    // Check if we're in limited mode
+                    if (batchData.isLimitedMode) {
+                        log(`Limited mode active: ${batchData.loadedRecords} of ${batchData.totalRecords} records loaded`);
+                        GlobalLoader.updateProgress(40, `Loading limited dataset (${batchData.loadedRecords} records)...`);
+                    }
                 }
                 
                 // Populate filter dropdowns from cached data
@@ -3509,14 +3572,25 @@ function initializeDashboardApp() {
             const a = parseFloat(record[currentCycleFields.a + '_raw']);
             const o = parseFloat(record[currentCycleFields.o + '_raw']);
 
-            if (!isNaN(o)) { // Using overall score to validate the record for this cycle
-                if (!isNaN(v)) averages.vision += v;
-                if (!isNaN(e)) averages.effort += e;
-                if (!isNaN(s)) averages.systems += s;
-                if (!isNaN(p)) averages.practice += p;
-                if (!isNaN(a)) averages.attitude += a;
-                averages.overall += o;
-                validRecordsCount++;
+            // Check if we have at least one valid VESPA score to count this record
+            const hasValidScores = !isNaN(v) || !isNaN(e) || !isNaN(s) || !isNaN(p) || !isNaN(a);
+            
+            if (hasValidScores) {
+                let scoreCount = 0;
+                let scoreSum = 0;
+                
+                if (!isNaN(v)) { averages.vision += v; scoreCount++; scoreSum += v; }
+                if (!isNaN(e)) { averages.effort += e; scoreCount++; scoreSum += e; }
+                if (!isNaN(s)) { averages.systems += s; scoreCount++; scoreSum += s; }
+                if (!isNaN(p)) { averages.practice += p; scoreCount++; scoreSum += p; }
+                if (!isNaN(a)) { averages.attitude += a; scoreCount++; scoreSum += a; }
+                
+                // Calculate overall as average of available scores
+                if (scoreCount > 0) {
+                    const calculatedOverall = scoreSum / scoreCount;
+                    averages.overall += calculatedOverall;
+                    validRecordsCount++;
+                }
             }
         });
 
@@ -6703,3 +6777,65 @@ window.testSelectFirstOption = function() {
         console.log('No radio buttons found');
     }
 };
+
+// New function to fetch data using optimized endpoint for large datasets
+async function fetchDashboardDataOptimized(establishmentId, cycle = 1) {
+    const chunkSize = 500;
+    let allRecords = [];
+    let chunkIndex = 0;
+    let hasMore = true;
+    let metadata = null;
+    
+    log("Using optimized data loading for large dataset");
+    
+    while (hasMore) {
+        const url = `${config.herokuAppUrl}/api/dashboard-data-optimized`;
+        const requestData = {
+            establishmentId,
+            cycle,
+            chunkSize,
+            chunkIndex
+        };
+        
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Failed to fetch chunk ${chunkIndex}`);
+            }
+            
+            const data = await response.json();
+            metadata = data.metadata;
+            
+            if (data.chunk && data.chunk.length > 0) {
+                allRecords = allRecords.concat(data.chunk);
+                log(`Loaded chunk ${chunkIndex}: ${data.chunk.length} records (total: ${allRecords.length})`);
+                
+                // Update progress
+                const progress = Math.min(90, 30 + (chunkIndex * 10));
+                GlobalLoader.updateProgress(progress, `Loading data... ${allRecords.length} of ${metadata.total_records} records`);
+                
+                chunkIndex++;
+                hasMore = chunkIndex < metadata.total_chunks;
+            } else {
+                hasMore = false;
+            }
+        } catch (error) {
+            log(`Error loading chunk ${chunkIndex}:`, error);
+            hasMore = false;
+        }
+    }
+    
+    log(`Optimized loading complete: ${allRecords.length} total records`);
+    return {
+        vespaResults: allRecords,
+        totalRecords: metadata ? metadata.total_records : allRecords.length,
+        metadata
+    };
+}
