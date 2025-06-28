@@ -1887,8 +1887,8 @@ function initializeDashboardApp() {
                     // Load QLA and insights for the trust, passing the trust identifier
                     const trustIdentifier = { trustFieldValue: trustFieldValue };
                     await Promise.all([
-                        loadQLAData(null, null, trustIdentifier),
-                        loadStudentCommentInsights(null, null, trustIdentifier)
+                        loadQLAData(null, null, trustIdentifier, [], currentCycle),
+                        loadStudentCommentInsights(null, null, trustIdentifier, [], currentCycle)
                     ]);
                     
                     // Add trust analysis note
@@ -2058,8 +2058,8 @@ function initializeDashboardApp() {
             renderDistributionCharts(batchData.vespaResults, trustAverages, themeColors, currentCycle, null, 'Trust Avg'); // Pass trust averages as comparison
             
             // Update other sections for the single school
-            await loadQLAData(null, schoolId);
-            await loadStudentCommentInsights(null, schoolId);
+            await loadQLAData(null, schoolId, null, [], currentCycle);
+            await loadStudentCommentInsights(null, schoolId, null, [], currentCycle);
             
             // Update the analysis note
             addTrustAnalysisNote(schoolName);
@@ -2249,10 +2249,10 @@ function initializeDashboardApp() {
                 await loadOverviewData(null, initialCycle, [], establishmentId);
                 GlobalLoader.updateProgress(80, 'Loading question analysis...');
                 
-                await loadQLAData(null, establishmentId);
+                await loadQLAData(null, establishmentId, null, [], initialCycle);
                 GlobalLoader.updateProgress(85, 'Loading student insights...');
                 
-                await loadStudentCommentInsights(null, establishmentId);
+                await loadStudentCommentInsights(null, establishmentId, null, [], initialCycle);
                 GlobalLoader.updateProgress(90, 'Finalizing...');
                 
                 // Add print report button after dashboard loads
@@ -2285,8 +2285,8 @@ function initializeDashboardApp() {
                     
                     const activeFilters = getActiveFilters();
                     
-                    // Reload all dashboard sections, not just overview
-                    await loadDashboardWithEstablishment(establishmentId, establishmentName, selectedCycle, activeFilters);
+                    // Reload all dashboard sections with new cycle
+                    await loadDashboardWithEstablishment(establishmentId, establishmentName);
                 });
             }
             
@@ -2341,8 +2341,8 @@ function initializeDashboardApp() {
                 } else if (currentStaffAdminId) {
                     // For a normal user, reload all sections with filters
                     loadOverviewData(currentStaffAdminId, selectedCycle, activeFilters);
-                    loadQLAData(currentStaffAdminId, null, null, activeFilters);
-                    loadStudentCommentInsights(currentStaffAdminId, null, null, activeFilters);
+                    loadQLAData(currentStaffAdminId, null, null, activeFilters, selectedCycle);
+                    loadStudentCommentInsights(currentStaffAdminId, null, null, activeFilters, selectedCycle);
                 }
             });
         }
@@ -2380,8 +2380,8 @@ function initializeDashboardApp() {
                 } else {
                     log("Clearing all filters");
                     loadOverviewData(currentStaffAdminId, selectedCycle, []);
-                    loadQLAData(currentStaffAdminId, null, null, []);
-                    loadStudentCommentInsights(currentStaffAdminId, null, null, []);
+                    loadQLAData(currentStaffAdminId, null, null, [], selectedCycle);
+                    loadStudentCommentInsights(currentStaffAdminId, null, null, [], selectedCycle);
                 }
             });
         }
@@ -5106,8 +5106,8 @@ function initializeDashboardApp() {
     let allQuestionResponses = []; // Cache for QLA data
     let questionMappings = { id_to_text: {}, psychometric_details: {} }; // Cache for mappings
 
-    async function loadQLAData(staffAdminId, establishmentId = null, trustIdentifier = null, filters = []) {
-        log(`Loading QLA data with Staff Admin ID: ${staffAdminId}, Establishment ID: ${establishmentId}, Filters:`, filters);
+    async function loadQLAData(staffAdminId, establishmentId = null, trustIdentifier = null, filters = [], cycle = 1) {
+        log(`Loading QLA data with Staff Admin ID: ${staffAdminId}, Establishment ID: ${establishmentId}, Cycle: ${cycle}, Filters:`, filters);
         try {
             // Fetch question mappings first
             try {
@@ -5123,7 +5123,7 @@ function initializeDashboardApp() {
             }
 
             // Fetch pre-calculated insights
-            const filterPayload = {};
+            const filterPayload = { cycle };  // Include cycle in the payload
             if (establishmentId) filterPayload.establishmentId = establishmentId;
             if (staffAdminId) filterPayload.staffAdminId = staffAdminId;
             if (trustIdentifier && trustIdentifier.trustFieldValue) {
@@ -5140,7 +5140,8 @@ function initializeDashboardApp() {
                     body: JSON.stringify({
                         analysisType: 'topBottom',
                         questionIds: [],
-                        filters: filterPayload
+                        filters: filterPayload,
+                        cycle: cycle  // Pass cycle explicitly
                     })
                 });
                 if (!res.ok) throw new Error(`QLA analysis failed (${res.status})`);
@@ -5195,7 +5196,7 @@ function initializeDashboardApp() {
                 renderEnhancedQuestionCards(top, bottom, []);
                 
                 // Load pre-calculated insights
-                await loadPreCalculatedInsights(filterPayload);
+                await loadPreCalculatedInsights(filterPayload, cycle);
                 
             } catch (err) {
                 errorLog('Failed QLA analysis', err);
@@ -5212,7 +5213,7 @@ function initializeDashboardApp() {
     }
 
     // New function to load pre-calculated insights
-    async function loadPreCalculatedInsights(filters) {
+    async function loadPreCalculatedInsights(filters, cycle = 1) {
         const insightsContainer = document.getElementById('qla-insights-grid');
         if (!insightsContainer) return;
         
@@ -5332,7 +5333,8 @@ function initializeDashboardApp() {
                     type: insight.type,
                     questionIds: insight.questionIds
                 })),
-                filters: filters
+                filters: filters,
+                cycle: cycle  // Include cycle in batch request
             };
             
             const res = await fetch(`${config.herokuAppUrl}/api/qla-batch-analysis`, {
@@ -5367,7 +5369,8 @@ function initializeDashboardApp() {
                         body: JSON.stringify({
                             analysisType: insight.type,
                             questionIds: insight.questionIds,
-                            filters: filters
+                            filters: filters,
+                            cycle: cycle  // Include cycle in individual requests
                         })
                     });
                     
@@ -5832,8 +5835,8 @@ function initializeDashboardApp() {
 
 
     // --- Section 3: Student Comment Insights ---
-    async function loadStudentCommentInsights(staffAdminId, establishmentId = null, trustIdentifier = null, filters = []) {
-        log(`Loading student comment insights with Staff Admin ID: ${staffAdminId}, Establishment ID: ${establishmentId}, Filters:`, filters);
+    async function loadStudentCommentInsights(staffAdminId, establishmentId = null, trustIdentifier = null, filters = [], cycle = 1) {
+        log(`Loading student comment insights with Staff Admin ID: ${staffAdminId}, Establishment ID: ${establishmentId}, Cycle: ${cycle}, Filters:`, filters);
         try {
             // Prepare filters for comment analysis
             const requestFilters = {};
@@ -6490,8 +6493,8 @@ function initializeDashboardApp() {
                 setTimeout(async () => {
                     try {
                         await Promise.all([
-                            loadQLAData(staffAdminRecordId),
-                            loadStudentCommentInsights(staffAdminRecordId)
+                            loadQLAData(staffAdminRecordId, null, null, [], initialCycle),
+                            loadStudentCommentInsights(staffAdminRecordId, null, null, [], initialCycle)
                         ]);
                     } catch (error) {
                         errorLog("Error loading secondary sections", error);
@@ -6555,6 +6558,13 @@ function initializeDashboardApp() {
                                 GlobalLoader.updateProgress(70, 'Rendering dashboard...');
                                 await loadOverviewData(staffAdminRecordId, selectedCycle, activeFilters);
                                 
+                                // Reload QLA and comment insights for the new cycle
+                                GlobalLoader.updateProgress(85, 'Updating analysis data...');
+                                await Promise.all([
+                                    loadQLAData(staffAdminRecordId, null, null, activeFilters, selectedCycle),
+                                    loadStudentCommentInsights(staffAdminRecordId, null, null, activeFilters, selectedCycle)
+                                ]);
+                                
                                 GlobalLoader.updateProgress(100, 'Dashboard updated!');
                                 setTimeout(() => GlobalLoader.hide(), 500);
                             }
@@ -6597,6 +6607,14 @@ function initializeDashboardApp() {
                         try {
                             GlobalLoader.updateProgress(40, 'Processing filtered data...');
                             await loadOverviewData(staffAdminRecordId, selectedCycle, activeFilters);
+                            
+                            // Also reload QLA and insights with filters
+                            GlobalLoader.updateProgress(70, 'Updating analysis data...');
+                            await Promise.all([
+                                loadQLAData(staffAdminRecordId, null, null, activeFilters, selectedCycle),
+                                loadStudentCommentInsights(staffAdminRecordId, null, null, activeFilters, selectedCycle)
+                            ]);
+                            
                             GlobalLoader.updateProgress(100, 'Filters applied!');
                             setTimeout(() => GlobalLoader.hide(), 300);
                         } catch (error) {
@@ -6624,6 +6642,8 @@ function initializeDashboardApp() {
                     const selectedCycle = cycleSelectElement ? parseInt(cycleSelectElement.value, 10) : 1;
                     log("Clearing all filters");
                     loadOverviewData(staffAdminRecordId, selectedCycle, []);
+                    loadQLAData(staffAdminRecordId, null, null, [], selectedCycle);
+                    loadStudentCommentInsights(staffAdminRecordId, null, null, [], selectedCycle);
                 });
             }
 
@@ -6714,5 +6734,4 @@ window.testSelectFirstOption = function() {
         console.log('No radio buttons found');
     }
 };
-
 
