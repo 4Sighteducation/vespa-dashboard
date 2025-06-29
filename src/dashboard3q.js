@@ -923,6 +923,276 @@ function initializeDashboardApp() {
                 color: var(--text-primary);
             }
             
+            /* Overview Header with Health Indicator */
+            .overview-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 1rem;
+            }
+            
+            .overview-header h2 {
+                margin: 0;
+            }
+            
+            /* Data Health Indicator Styles */
+            .data-health-indicator {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                padding: 8px 16px;
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                margin-left: auto;
+            }
+            
+            .data-health-indicator:hover {
+                background: rgba(255, 255, 255, 0.1);
+                transform: translateY(-1px);
+            }
+            
+            .data-health-dot {
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                animation: pulse 2s infinite;
+            }
+            
+            .data-health-dot.green {
+                background-color: #10b981;
+                box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
+            }
+            
+            .data-health-dot.amber {
+                background-color: #f59e0b;
+                box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+            }
+            
+            .data-health-dot.red {
+                background-color: #ef4444;
+                box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.3);
+            }
+            
+            .data-health-dot.gray {
+                background-color: #6b7280;
+                box-shadow: 0 0 0 2px rgba(107, 114, 128, 0.3);
+            }
+            
+            @keyframes pulse {
+                0% {
+                    box-shadow: 0 0 0 0 currentColor;
+                }
+                70% {
+                    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0);
+                }
+                100% {
+                    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+                }
+            }
+            
+            .data-health-text {
+                font-size: 14px;
+                font-weight: 600;
+                color: #e2e8f0;
+            }
+            
+            /* Data Health Modal */
+            .data-health-modal {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.8);
+                backdrop-filter: blur(10px);
+                z-index: 10000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                opacity: 0;
+                visibility: hidden;
+                transition: all 0.3s ease;
+            }
+            
+            .data-health-modal.active {
+                opacity: 1;
+                visibility: visible;
+            }
+            
+            .data-health-content {
+                background: var(--card-bg, #1a1a2e);
+                border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+                border-radius: 12px;
+                padding: 2rem;
+                max-width: 600px;
+                width: 90%;
+                max-height: 80vh;
+                overflow-y: auto;
+                transform: scale(0.9);
+                transition: transform 0.3s ease;
+            }
+            
+            .data-health-modal.active .data-health-content {
+                transform: scale(1);
+            }
+            
+            .data-health-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 1.5rem;
+            }
+            
+            .data-health-header h3 {
+                margin: 0;
+                color: #ffffff;
+                font-size: 1.5rem;
+            }
+            
+            .data-health-close {
+                background: none;
+                border: none;
+                color: #a8b2d1;
+                cursor: pointer;
+                padding: 0.5rem;
+                transition: color 0.3s ease;
+            }
+            
+            .data-health-close:hover {
+                color: #ffffff;
+            }
+            
+            .data-health-summary {
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 8px;
+                padding: 1.5rem;
+                margin-bottom: 1.5rem;
+            }
+            
+            .health-status-indicator {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                margin-bottom: 1rem;
+            }
+            
+            .health-status-dot {
+                width: 24px;
+                height: 24px;
+                border-radius: 50%;
+            }
+            
+            .health-status-text {
+                font-size: 1.25rem;
+                font-weight: 700;
+            }
+            
+            .health-status-text.green { color: #10b981; }
+            .health-status-text.amber { color: #f59e0b; }
+            .health-status-text.red { color: #ef4444; }
+            .health-status-text.gray { color: #6b7280; }
+            
+            .data-health-stats {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1rem;
+                margin-top: 1rem;
+            }
+            
+            .health-stat {
+                background: rgba(255, 255, 255, 0.03);
+                padding: 1rem;
+                border-radius: 6px;
+                text-align: center;
+            }
+            
+            .health-stat-value {
+                font-size: 1.5rem;
+                font-weight: 700;
+                color: #ffffff;
+                margin-bottom: 0.25rem;
+            }
+            
+            .health-stat-label {
+                font-size: 0.9rem;
+                color: #a8b2d1;
+            }
+            
+            .data-health-issues {
+                margin-bottom: 1.5rem;
+            }
+            
+            .health-issue-section {
+                margin-bottom: 1.5rem;
+            }
+            
+            .health-issue-section h4 {
+                color: #ffffff;
+                margin-bottom: 0.75rem;
+                font-size: 1.1rem;
+            }
+            
+            .issue-list {
+                max-height: 200px;
+                overflow-y: auto;
+                background: rgba(0, 0, 0, 0.3);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 6px;
+                padding: 0.5rem;
+            }
+            
+            .issue-item {
+                padding: 0.5rem;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                font-size: 0.9rem;
+            }
+            
+            .issue-item:last-child {
+                border-bottom: none;
+            }
+            
+            .student-name {
+                color: #ffffff;
+                font-weight: 600;
+            }
+            
+            .issue-type {
+                color: #a8b2d1;
+                font-size: 0.85rem;
+                margin-left: 0.5rem;
+            }
+            
+            .data-health-recommendations {
+                background: rgba(59, 130, 246, 0.1);
+                border: 1px solid rgba(59, 130, 246, 0.3);
+                border-radius: 8px;
+                padding: 1rem;
+            }
+            
+            .data-health-recommendations h4 {
+                color: #3b82f6;
+                margin-bottom: 0.75rem;
+                font-size: 1.1rem;
+            }
+            
+            .recommendation-item {
+                display: flex;
+                align-items: flex-start;
+                gap: 0.5rem;
+                margin-bottom: 0.5rem;
+                color: #e2e8f0;
+                font-size: 0.95rem;
+            }
+            
+            .recommendation-item:before {
+                content: '→';
+                color: #3b82f6;
+                font-weight: bold;
+            }
+            
             /* Theme Analysis Pending Styles */
             .theme-analysis-pending {
                 background: rgba(255, 255, 255, 0.05);
@@ -1183,7 +1453,13 @@ function initializeDashboardApp() {
                     <h1>VESPA Performance Dashboard</h1>
                 </header>
                 <section id="overview-section" style="${showSuperUserControls ? 'display: none;' : ''}">
-                    <h2>School Overview & Benchmarking</h2>
+                    <div class="overview-header">
+                        <h2>School Overview & Benchmarking</h2>
+                        <div class="data-health-indicator" id="data-health-indicator" style="display: none;">
+                            <div class="data-health-dot gray" id="health-dot"></div>
+                            <span class="data-health-text">Data Health</span>
+                        </div>
+                    </div>
                     <div class="controls">
                         <div class="controls-left">
                             <label for="cycle-select">Select Cycle:</label>
@@ -1309,12 +1585,39 @@ function initializeDashboardApp() {
                     <div id="common-themes-container"></div>
                 </section>
             </div>
+            
+            <!-- Data Health Modal -->
+            <div id="data-health-modal" class="data-health-modal">
+                <div class="data-health-content">
+                    <div class="data-health-header">
+                        <h3>Data Health Check</h3>
+                        <button class="data-health-close" onclick="window.hideDataHealthModal()">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 6L6 18M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div id="data-health-body">
+                        <!-- Content will be dynamically populated -->
+                    </div>
+                </div>
+            </div>
         `;
         
         // Add print report button after dashboard is rendered
         addPrintReportButton();
         
         // Add event listeners for UI elements
+        
+        // Add data health modal click outside to close
+        const dataHealthModal = document.getElementById('data-health-modal');
+        if (dataHealthModal) {
+            dataHealthModal.addEventListener('click', function(e) {
+                if (e.target === dataHealthModal) {
+                    window.hideDataHealthModal();
+                }
+            });
+        }
         
         // Add filter toggle functionality
         const filterToggleBtn = document.getElementById('filter-toggle-btn');
@@ -1897,6 +2200,10 @@ function initializeDashboardApp() {
                     // Update trust header with school count
                     updateTrustHeader();
                     
+                    // Check data health for trust
+                    GlobalLoader.updateProgress(95, 'Checking data health...');
+                    await checkDataHealth(null, null, trustFieldValue, currentCycle);
+                    
                     GlobalLoader.updateProgress(100, 'Trust dashboard ready!');
                     setTimeout(() => GlobalLoader.hide(), 500);
                     
@@ -2257,6 +2564,9 @@ function initializeDashboardApp() {
                 
                 // Add print report button after dashboard loads
                 addPrintReportButton();
+                
+                // Check data health for establishment
+                await checkDataHealth(establishmentId, null, null, initialCycle);
                 
             } catch (fetchError) {
                 // If the initial fetch fails, show a more helpful error message
@@ -6302,6 +6612,173 @@ function initializeDashboardApp() {
         return insights;
     }
 
+    // --- Data Health Indicator Functions ---
+    let currentHealthData = null;
+    
+    async function checkDataHealth(establishmentId = null, staffAdminId = null, trustFieldValue = null, cycle = 1) {
+        try {
+            const requestData = {
+                cycle: cycle
+            };
+            
+            if (establishmentId) requestData.establishmentId = establishmentId;
+            if (staffAdminId) requestData.staffAdminId = staffAdminId;
+            if (trustFieldValue) requestData.trustFieldValue = trustFieldValue;
+            
+            log('Checking data health with params:', requestData);
+            
+            const response = await fetch(`${config.herokuAppUrl}/api/data-health-check`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Data health check failed: ${response.status}`);
+            }
+            
+            const healthData = await response.json();
+            currentHealthData = healthData;
+            
+            // Update the indicator
+            updateDataHealthIndicator(healthData.status);
+            
+            return healthData;
+            
+        } catch (error) {
+            errorLog('Failed to check data health:', error);
+            // Show gray indicator on error
+            updateDataHealthIndicator('gray');
+            return null;
+        }
+    }
+    
+    function updateDataHealthIndicator(status) {
+        const indicator = document.getElementById('data-health-indicator');
+        const dot = document.getElementById('health-dot');
+        
+        if (indicator && dot) {
+            // Show the indicator
+            indicator.style.display = 'inline-flex';
+            
+            // Update dot color
+            dot.className = `data-health-dot ${status}`;
+            
+            // Add click handler if not already added
+            if (!indicator.dataset.listenerAdded) {
+                indicator.addEventListener('click', showDataHealthModal);
+                indicator.dataset.listenerAdded = 'true';
+            }
+        }
+    }
+    
+    function showDataHealthModal() {
+        const modal = document.getElementById('data-health-modal');
+        const body = document.getElementById('data-health-body');
+        
+        if (!modal || !body || !currentHealthData) return;
+        
+        // Build modal content
+        const statusText = {
+            green: 'All data synchronized',
+            amber: 'Minor discrepancies detected',
+            red: 'Significant data issues',
+            gray: 'No data available'
+        };
+        
+        const statusColors = {
+            green: '#10b981',
+            amber: '#f59e0b',
+            red: '#ef4444',
+            gray: '#6b7280'
+        };
+        
+        body.innerHTML = `
+            <div class="data-health-summary">
+                <div class="health-status-indicator">
+                    <div class="health-status-dot ${currentHealthData.status}" style="background-color: ${statusColors[currentHealthData.status]}"></div>
+                    <span class="health-status-text ${currentHealthData.status}">${statusText[currentHealthData.status]}</span>
+                </div>
+                
+                <div class="data-health-stats">
+                    <div class="health-stat">
+                        <div class="health-stat-value">${currentHealthData.summary.object10_count}</div>
+                        <div class="health-stat-label">VESPA Records</div>
+                    </div>
+                    <div class="health-stat">
+                        <div class="health-stat-value">${currentHealthData.summary.object29_count}</div>
+                        <div class="health-stat-label">Questionnaire Records</div>
+                    </div>
+                    <div class="health-stat">
+                        <div class="health-stat-value">${currentHealthData.summary.matched_count}</div>
+                        <div class="health-stat-label">Matched Records</div>
+                    </div>
+                    <div class="health-stat">
+                        <div class="health-stat-value">${currentHealthData.summary.discrepancy_rate}%</div>
+                        <div class="health-stat-label">Discrepancy Rate</div>
+                    </div>
+                </div>
+            </div>
+            
+            ${(currentHealthData.issues.total_missing_questionnaires > 0 || currentHealthData.issues.total_missing_scores > 0) ? `
+                <div class="data-health-issues">
+                    ${currentHealthData.issues.total_missing_questionnaires > 0 ? `
+                        <div class="health-issue-section">
+                            <h4>Students Missing Questionnaires (${currentHealthData.issues.total_missing_questionnaires})</h4>
+                            <div class="issue-list">
+                                ${currentHealthData.issues.missing_questionnaires.map(student => `
+                                    <div class="issue-item">
+                                        <span class="student-name">${student.student_name}</span>
+                                        <span class="issue-type">Has VESPA scores, needs questionnaire</span>
+                                    </div>
+                                `).join('')}
+                                ${currentHealthData.issues.total_missing_questionnaires > 50 ? 
+                                    `<div class="issue-item"><em>... and ${currentHealthData.issues.total_missing_questionnaires - 50} more</em></div>` : ''}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${currentHealthData.issues.total_missing_scores > 0 ? `
+                        <div class="health-issue-section">
+                            <h4>Students Missing VESPA Scores (${currentHealthData.issues.total_missing_scores})</h4>
+                            <div class="issue-list">
+                                ${currentHealthData.issues.missing_scores.map(student => `
+                                    <div class="issue-item">
+                                        <span class="student-name">${student.student_name}</span>
+                                        <span class="issue-type">Has questionnaire, needs VESPA scores</span>
+                                    </div>
+                                `).join('')}
+                                ${currentHealthData.issues.total_missing_scores > 50 ? 
+                                    `<div class="issue-item"><em>... and ${currentHealthData.issues.total_missing_scores - 50} more</em></div>` : ''}
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            ` : ''}
+            
+            ${currentHealthData.recommendations && currentHealthData.recommendations.length > 0 ? `
+                <div class="data-health-recommendations">
+                    <h4>Recommendations</h4>
+                    ${currentHealthData.recommendations.map(rec => `
+                        <div class="recommendation-item">${rec}</div>
+                    `).join('')}
+                </div>
+            ` : ''}
+        `;
+        
+        // Show modal
+        modal.classList.add('active');
+    }
+    
+    window.hideDataHealthModal = function() {
+        const modal = document.getElementById('data-health-modal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    };
+    
     // Add print button to the dashboard header
     function addPrintReportButton() {
         const headerElem = document.querySelector('#dashboard-container header');
@@ -6489,6 +6966,9 @@ function initializeDashboardApp() {
                 // Add print report button after dashboard loads
                 addPrintReportButton();
                 
+                // Check data health after initial load
+                checkDataHealth(null, staffAdminRecordId, null, initialCycle);
+                
                 // Load other sections in background after main dashboard is ready
                 setTimeout(async () => {
                     try {
@@ -6565,6 +7045,10 @@ function initializeDashboardApp() {
                                     loadStudentCommentInsights(staffAdminRecordId, null, null, activeFilters, selectedCycle)
                                 ]);
                                 
+                                // Check data health for new cycle
+                                GlobalLoader.updateProgress(95, 'Checking data health...');
+                                await checkDataHealth(null, staffAdminRecordId, null, selectedCycle);
+                                
                                 GlobalLoader.updateProgress(100, 'Dashboard updated!');
                                 setTimeout(() => GlobalLoader.hide(), 500);
                             }
@@ -6614,6 +7098,10 @@ function initializeDashboardApp() {
                                 loadQLAData(staffAdminRecordId, null, null, activeFilters, selectedCycle),
                                 loadStudentCommentInsights(staffAdminRecordId, null, null, activeFilters, selectedCycle)
                             ]);
+                            
+                            // Check data health with current filters
+                            GlobalLoader.updateProgress(90, 'Checking data health...');
+                            await checkDataHealth(null, staffAdminRecordId, null, selectedCycle);
                             
                             GlobalLoader.updateProgress(100, 'Filters applied!');
                             setTimeout(() => GlobalLoader.hide(), 300);
@@ -6734,4 +7222,6 @@ window.testSelectFirstOption = function() {
         console.log('No radio buttons found');
     }
 };
+
+
 
