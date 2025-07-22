@@ -3438,4 +3438,36 @@ body.knack-body .kn-content {
     }
 }
 
+/* --- Filter Dropdown Styles for Data Availability --- */
+#dashboard-container select option.filter-option-disabled,
+#dashboard-container select option:disabled {
+    color: var(--text-muted);
+    font-style: italic;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+#dashboard-container select option.filter-option-disabled::after,
+#dashboard-container select option:disabled::after {
+    content: " (No data)";
+}
+
+/* Style for filter options with counts */
+#dashboard-container .filter-item select {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Ensure dropdown text is readable */
+#dashboard-container select option {
+    padding: 6px 10px;
+    transition: background-color 0.2s ease;
+}
+
+#dashboard-container select option:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Visual indicator for zero-count options */
+#dashboard-container select option.no-data {
+    opacity: 0.6;
+}
 
