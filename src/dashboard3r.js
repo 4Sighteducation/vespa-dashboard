@@ -1,4 +1,4 @@
-// dashboard2x.js
+// dashboard3r.js
 // @ts-nocheck
 
 // lobal loader management
@@ -97,6 +97,30 @@ const DataCache = {
             localStorage.setItem(`vespa_cache_${key}`, JSON.stringify(cacheData));
         } catch (e) {
             console.warn('Failed to save to localStorage:', e);
+            // If quota exceeded, try to clear old cache items
+            if (e.name === 'QuotaExceededError') {
+                try {
+                    // Clear all vespa cache items
+                    const keysToRemove = [];
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key && key.startsWith('vespa_cache_')) {
+                            keysToRemove.push(key);
+                        }
+                    }
+                    // Remove old items
+                    keysToRemove.forEach(k => localStorage.removeItem(k));
+                    console.log('Cleared localStorage cache due to quota exceeded');
+                    // Try saving again
+                    try {
+                        localStorage.setItem(`vespa_cache_${key}`, JSON.stringify(cacheData));
+                    } catch (retryError) {
+                        console.warn('Failed to save after clearing cache:', retryError);
+                    }
+                } catch (clearError) {
+                    console.warn('Failed to clear cache:', clearError);
+                }
+            }
         }
     },
     
@@ -7222,6 +7246,5 @@ window.testSelectFirstOption = function() {
         console.log('No radio buttons found');
     }
 };
-
 
 
