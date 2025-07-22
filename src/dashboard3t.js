@@ -363,14 +363,16 @@ function initializeDashboardApp() {
     }
     
     // New batch data fetching function
-    async function fetchDashboardInitialData(staffAdminId, establishmentId, cycle = 1) {
-        // Check cache first
-        const cachedData = DataCache.get('initialData');
-        if (cachedData && cachedData.cycle === cycle && 
-            cachedData.staffAdminId === staffAdminId && 
-            cachedData.establishmentId === establishmentId) {
-            log("Using cached initial data");
-            return cachedData;
+    async function fetchDashboardInitialData(staffAdminId, establishmentId, cycle = 1, forceRefresh = false) {
+        // Check cache first (unless force refresh)
+        if (!forceRefresh) {
+            const cachedData = DataCache.get('initialData');
+            if (cachedData && cachedData.cycle === cycle && 
+                cachedData.staffAdminId === staffAdminId && 
+                cachedData.establishmentId === establishmentId) {
+                log("Using cached initial data");
+                return cachedData;
+            }
         }
         
         // Check if already loading
@@ -398,7 +400,8 @@ function initializeDashboardApp() {
         const requestData = {
             staffAdminId,
             establishmentId,
-            cycle
+            cycle,
+            forceRefresh
         };
         
         log("Fetching dashboard initial data from batch endpoint:", requestData);
@@ -1023,6 +1026,37 @@ function initializeDashboardApp() {
                 color: #e2e8f0;
             }
             
+            /* Data Refresh Button */
+            .data-refresh-btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 24px;
+                height: 24px;
+                padding: 0;
+                margin-left: 8px;
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 4px;
+                color: #e2e8f0;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            }
+            
+            .data-refresh-btn:hover {
+                background: rgba(255, 255, 255, 0.2);
+                border-color: rgba(255, 255, 255, 0.3);
+                color: #ffffff;
+            }
+            
+            .data-refresh-btn.spinning svg {
+                animation: spin 1s linear infinite;
+            }
+            
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+            
             /* Data Health Modal */
             .data-health-modal {
                 position: fixed;
@@ -1482,6 +1516,12 @@ function initializeDashboardApp() {
                         <div class="data-health-indicator" id="data-health-indicator" style="display: none;">
                             <div class="data-health-dot gray" id="health-dot"></div>
                             <span class="data-health-text">Data Health</span>
+                            <button class="data-refresh-btn" id="data-refresh-btn" title="Refresh data">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 4v6h6M23 20v-6h-6"/>
+                                    <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+                                </svg>
+                            </button>
                         </div>
                     </div>
                     <div class="controls">
@@ -6681,10 +6721,11 @@ function initializeDashboardApp() {
     // --- Data Health Indicator Functions ---
     let currentHealthData = null;
     
-    async function checkDataHealth(establishmentId = null, staffAdminId = null, trustFieldValue = null, cycle = 1) {
+    async function checkDataHealth(establishmentId = null, staffAdminId = null, trustFieldValue = null, cycle = 1, forceRefresh = false) {
         try {
             const requestData = {
-                cycle: cycle
+                cycle: cycle,
+                forceRefresh: forceRefresh
             };
             
             if (establishmentId) requestData.establishmentId = establishmentId;
@@ -6724,6 +6765,7 @@ function initializeDashboardApp() {
     function updateDataHealthIndicator(status) {
         const indicator = document.getElementById('data-health-indicator');
         const dot = document.getElementById('health-dot');
+        const refreshBtn = document.getElementById('data-refresh-btn');
         
         if (indicator && dot) {
             // Show the indicator
@@ -6736,6 +6778,59 @@ function initializeDashboardApp() {
             if (!indicator.dataset.listenerAdded) {
                 indicator.addEventListener('click', showDataHealthModal);
                 indicator.dataset.listenerAdded = 'true';
+            }
+            
+            // Add refresh button handler
+            if (refreshBtn && !refreshBtn.dataset.listenerAdded) {
+                refreshBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation(); // Prevent triggering the modal
+                    
+                    // Add spinning animation
+                    refreshBtn.classList.add('spinning');
+                    
+                    try {
+                        // Clear all caches
+                        DataCache.clear();
+                        
+                        // Get current cycle
+                        const cycleSelect = document.getElementById('cycle-select');
+                        const currentCycle = cycleSelect ? parseInt(cycleSelect.value, 10) : 1;
+                        
+                        // Force refresh data
+                        GlobalLoader.init();
+                        GlobalLoader.updateProgress(10, 'Refreshing data...');
+                        
+                        if (staffAdminRecordId) {
+                            // Fetch fresh data with force refresh
+                            const batchData = await fetchDashboardInitialData(staffAdminRecordId, null, currentCycle, true);
+                            
+                            GlobalLoader.updateProgress(50, 'Updating dashboard...');
+                            
+                            // Reload all sections
+                            const activeFilters = getActiveFilters();
+                            await loadOverviewData(staffAdminRecordId, currentCycle, activeFilters);
+                            
+                            GlobalLoader.updateProgress(70, 'Updating analysis...');
+                            await Promise.all([
+                                loadQLAData(staffAdminRecordId, null, null, activeFilters, currentCycle),
+                                loadStudentCommentInsights(staffAdminRecordId, null, null, activeFilters, currentCycle)
+                            ]);
+                            
+                            // Recheck data health with force refresh
+                            GlobalLoader.updateProgress(90, 'Checking data health...');
+                            await checkDataHealth(null, staffAdminRecordId, null, currentCycle, true);
+                            
+                            GlobalLoader.updateProgress(100, 'Data refreshed!');
+                            setTimeout(() => GlobalLoader.hide(), 500);
+                        }
+                    } catch (error) {
+                        errorLog('Failed to refresh data:', error);
+                        GlobalLoader.hide();
+                    } finally {
+                        refreshBtn.classList.remove('spinning');
+                    }
+                });
+                refreshBtn.dataset.listenerAdded = 'true';
             }
         }
     }
@@ -7288,5 +7383,6 @@ window.testSelectFirstOption = function() {
         console.log('No radio buttons found');
     }
 };
+
 
 
