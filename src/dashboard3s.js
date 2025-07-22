@@ -1,4 +1,4 @@
-// dashboard3r.js
+// dashboard2x.js
 // @ts-nocheck
 
 // lobal loader management
@@ -2195,7 +2195,7 @@ function initializeDashboardApp() {
                     currentTrustSchools = trustData.trustSchools || [];
                     
                     // Populate filter dropdowns from trust data
-                    populateFilterDropdownsFromCache(trustData.filterOptions);
+                    populateFilterDropdownsFromCache(trustData.filterOptions, trustData.filterCounts);
                     
                     // Set up trust school filter
                     setupTrustSchoolFilter();
@@ -2571,7 +2571,7 @@ function initializeDashboardApp() {
                 
                 // Populate filter dropdowns from cached data
                 GlobalLoader.updateProgress(50, 'Setting up filters...');
-                populateFilterDropdownsFromCache(batchData.filterOptions);
+                populateFilterDropdownsFromCache(batchData.filterOptions, batchData.filterCounts);
                 
                 // Load all sections with cached data
                 GlobalLoader.updateProgress(70, 'Rendering visualizations...');
@@ -2606,9 +2606,15 @@ function initializeDashboardApp() {
             
             // Update event listeners to use establishment filter
             if (cycleSelectElement) {
+                // Preserve current selected value before cloning
+                const currentSelectedCycle = cycleSelectElement.value;
+                
                 // Remove old listeners
                 const newCycleSelect = cycleSelectElement.cloneNode(true);
                 cycleSelectElement.parentNode.replaceChild(newCycleSelect, cycleSelectElement);
+                
+                // Restore the selected value after cloning
+                newCycleSelect.value = currentSelectedCycle;
                 
                 newCycleSelect.addEventListener('change', async (event) => {
                     const selectedCycle = parseInt(event.target.value, 10);
@@ -3062,26 +3068,47 @@ function initializeDashboardApp() {
         log(`Populated ${dropdownId} with ${items.length} items`);
     }
     
-    // New function to populate filter dropdowns from cached data
-    function populateFilterDropdownsFromCache(filterOptions) {
-        if (!filterOptions) {
-            log("No filter options provided to populateFilterDropdownsFromCache");
-            return;
-        }
+    function populateDropdownWithCounts(dropdownId, items, counts = {}) {
+        const dropdown = document.getElementById(dropdownId);
+        if (!dropdown) return;
         
-        log("Populating filter dropdowns from cache");
+        // Keep the "All" option
+        const allOption = dropdown.querySelector('option[value=""]');
+        dropdown.innerHTML = '';
+        if (allOption) dropdown.appendChild(allOption);
         
-        // Populate each dropdown
-        populateDropdown('group-filter', filterOptions.groups || []);
-        populateDropdown('course-filter', filterOptions.courses || []);
-        populateDropdown('year-group-filter', filterOptions.yearGroups || []);
-        populateDropdown('faculty-filter', filterOptions.faculties || []);
+        items.forEach(item => {
+            const option = document.createElement('option');
+            let itemKey, itemText;
+            
+            if (typeof item === 'object' && item !== null) {
+                if (item.name !== undefined && item.id !== undefined) {
+                    itemKey = item.id;
+                    itemText = item.name;
+                } else {
+                    itemKey = JSON.stringify(item);
+                    itemText = JSON.stringify(item);
+                }
+            } else {
+                itemKey = item;
+                itemText = item;
+            }
+            
+            const count = counts[itemKey] || 0;
+            
+            option.value = itemKey;
+            option.textContent = count > 0 ? `${itemText} (${count})` : `${itemText} (No data)`;
+            option.disabled = count === 0;
+            option.className = count === 0 ? 'filter-option-disabled' : '';
+            
+            dropdown.appendChild(option);
+        });
         
-        log("Filter dropdowns populated from cache");
+        log(`Populated ${dropdownId} with ${items.length} items including counts`);
     }
-
+    
     // New function to populate filter dropdowns from cached data
-    function populateFilterDropdownsFromCache(filterOptions) {
+    function populateFilterDropdownsFromCache(filterOptions, filterCounts) {
         if (!filterOptions) {
             log("No filter options provided to populateFilterDropdownsFromCache");
             return;
@@ -3089,11 +3116,26 @@ function initializeDashboardApp() {
         
         log("Populating filter dropdowns from cache");
         
-        // Populate each dropdown
-        populateDropdown('group-filter', filterOptions.groups || []);
-        populateDropdown('course-filter', filterOptions.courses || []);
-        populateDropdown('year-group-filter', filterOptions.yearGroups || []);
-        populateDropdown('faculty-filter', filterOptions.faculties || []);
+        // Standard year groups that should always be visible
+        const STANDARD_YEAR_GROUPS = ['Yr7', 'Yr8', 'Yr9', 'Yr10', 'Yr11', 'Yr12', 'Yr13'];
+        
+        // Ensure all standard year groups are included
+        const allYearGroups = [...new Set([...STANDARD_YEAR_GROUPS, ...(filterOptions.yearGroups || [])])];
+        allYearGroups.sort();
+        
+        // If we have filter counts, use the enhanced dropdown population
+        if (filterCounts) {
+            populateDropdownWithCounts('group-filter', filterOptions.groups || [], filterCounts.groups || {});
+            populateDropdownWithCounts('course-filter', filterOptions.courses || [], filterCounts.courses || {});
+            populateDropdownWithCounts('year-group-filter', allYearGroups, filterCounts.yearGroups || {});
+            populateDropdownWithCounts('faculty-filter', filterOptions.faculties || [], filterCounts.faculties || {});
+        } else {
+            // Fallback to regular population
+            populateDropdown('group-filter', filterOptions.groups || []);
+            populateDropdown('course-filter', filterOptions.courses || []);
+            populateDropdown('year-group-filter', allYearGroups);
+            populateDropdown('faculty-filter', filterOptions.faculties || []);
+        }
         
         log("Filter dropdowns populated from cache");
     }
@@ -6981,7 +7023,7 @@ function initializeDashboardApp() {
                 
                 // Populate filter dropdowns from cached data
                 GlobalLoader.updateProgress(50, 'Setting up filters...');
-                populateFilterDropdownsFromCache(batchData.filterOptions);
+                populateFilterDropdownsFromCache(batchData.filterOptions, batchData.filterCounts);
                 
                 // Load overview section first, then other sections
                 GlobalLoader.updateProgress(70, 'Rendering dashboard...');
