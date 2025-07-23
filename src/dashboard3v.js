@@ -53,6 +53,61 @@ const GlobalLoader = {
     },
     
     updateProgress(percentage, text) {
+// dashboard2x.js
+// @ts-nocheck
+
+// lobal loader management
+if (window.VESPA_DASHBOARD_LOADED) {
+    console.log('VESPA Dashboard script already loaded');
+    // Already loaded, do not initialize again
+} else {
+    window.VESPA_DASHBOARD_LOADED = true;
+}
+
+const GlobalLoader = {
+    overlay: null,
+    progressBar: null,
+    progressText: null,
+    
+    init() {
+        // Remove any existing loader first
+        const existing = document.getElementById('global-loading-overlay');
+        if (existing) {
+            existing.remove();
+        }
+        
+        // Create loader HTML immediately
+        const loaderHTML = `
+            <div class="global-loading-overlay active" id="global-loading-overlay" style="z-index: 999999 !important;">
+                <div class="loading-content">
+                    <div class="spinner"></div>
+                    <div class="loading-text">Initializing VESPA Dashboard</div>
+                    <div class="loading-subtext">Loading your performance data...</div>
+                    <div class="loading-progress">
+                        <div class="loading-progress-bar" id="loading-progress-bar"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Insert at the end of body to ensure it's on top of everything
+        document.body.insertAdjacentHTML('beforeend', loaderHTML);
+        
+        this.overlay = document.getElementById('global-loading-overlay');
+        this.progressBar = document.getElementById('loading-progress-bar');
+        this.progressText = this.overlay.querySelector('.loading-subtext');
+        
+        // Force the overlay to the top by ensuring proper z-index
+        if (this.overlay) {
+            this.overlay.style.position = 'fixed';
+            this.overlay.style.top = '0';
+            this.overlay.style.left = '0';
+            this.overlay.style.width = '100%';
+            this.overlay.style.height = '100%';
+        }
+    },
+    
+    updateProgress(percentage, text) {
         if (this.progressBar) {
             this.progressBar.style.width = `${percentage}%`;
         }
@@ -3773,7 +3828,9 @@ function initializeDashboardApp() {
             GlobalLoader.updateProgress(70, 'Calculating statistics...');
             
             // Update response statistics using cached data
-            updateResponseStatsFromCache(schoolVespaResults, cycle);
+            // Pass both unfiltered and filtered data for accurate counts
+            const unfilteredResults = batchData.vespaResults || [];
+            updateResponseStatsFromCache(unfilteredResults, additionalFilters.length > 0 ? schoolVespaResults : null, cycle);
             
             // Fetch ERI values (batch may not include them for large schools)
             let schoolERI = batchData.schoolERI;
@@ -3850,8 +3907,10 @@ function initializeDashboardApp() {
     }
     
     // Update response stats from cached data
-    function updateResponseStatsFromCache(vespaResults, cycle) {
-        const totalStudents = vespaResults.length;
+    function updateResponseStatsFromCache(allResults, filteredResults, cycle) {
+        // Use filtered results if provided, otherwise use all results
+        const dataForStats = filteredResults || allResults;
+        const totalStudents = allResults.length;  // Always show total from unfiltered data
         
         // Count responses where vision score (V1) is not empty for the selected cycle
         const fieldMappings = {
@@ -3867,16 +3926,33 @@ function initializeDashboardApp() {
         }
         
         let responseCount = 0;
-        vespaResults.forEach(record => {
+        let filteredResponseCount = 0;
+        
+        // Count responses in all data
+        allResults.forEach(record => {
             const visionScore = record[visionField + '_raw'];
             if (visionScore !== null && visionScore !== undefined && visionScore !== '') {
                 responseCount++;
             }
         });
         
-        // Calculate completion rate
-        const completionRate = totalStudents > 0 
-            ? ((responseCount / totalStudents) * 100).toFixed(1) 
+        // If we have filtered data, count responses in filtered data too
+        if (filteredResults) {
+            filteredResults.forEach(record => {
+                const visionScore = record[visionField + '_raw'];
+                if (visionScore !== null && visionScore !== undefined && visionScore !== '') {
+                    filteredResponseCount++;
+                }
+            });
+        }
+        
+        // Use filtered count if available, otherwise use total count
+        const displayResponseCount = filteredResults ? filteredResponseCount : responseCount;
+        const displayTotalStudents = filteredResults ? filteredResults.length : totalStudents;
+        
+        // Calculate completion rate based on displayed values
+        const completionRate = displayTotalStudents > 0 
+            ? ((displayResponseCount / displayTotalStudents) * 100).toFixed(1) 
             : '0.0';
         
         // Update the UI
@@ -3884,11 +3960,16 @@ function initializeDashboardApp() {
         const totalStudentsElement = document.getElementById('total-students');
         const completionRateElement = document.getElementById('completion-rate');
         
-        if (cycleResponsesElement) cycleResponsesElement.textContent = responseCount.toLocaleString();
-        if (totalStudentsElement) totalStudentsElement.textContent = totalStudents.toLocaleString();
+        if (cycleResponsesElement) cycleResponsesElement.textContent = displayResponseCount.toLocaleString();
+        if (totalStudentsElement) totalStudentsElement.textContent = displayTotalStudents.toLocaleString();
         if (completionRateElement) completionRateElement.textContent = `${completionRate}%`;
         
-        log(`Response Stats - Total Students: ${totalStudents}, Responses: ${responseCount}, Completion: ${completionRate}%`);
+        // Log both filtered and unfiltered stats for debugging
+        if (filteredResults) {
+            log(`Response Stats (Filtered) - Total Students: ${displayTotalStudents} (of ${totalStudents}), Responses: ${displayResponseCount} (of ${responseCount}), Completion: ${completionRate}%`);
+        } else {
+            log(`Response Stats - Total Students: ${totalStudents}, Responses: ${responseCount}, Completion: ${completionRate}%`);
+        }
     }
 
     // Renamed to be specific for school data and to potentially handle cycles
@@ -5252,9 +5333,12 @@ function initializeDashboardApp() {
             
             const nationalAverageForElement = comparisonAverages ? comparisonAverages[element.key] : null;
             const canvasId = `${element.key}-distribution-chart`;
-            let chartTitle = `${element.name} Score Distribution - Cycle ${cycle}`;
+            
+            // Calculate total responses for this element
+            const totalResponses = scoreDistribution.reduce((sum, count) => sum + count, 0);
+            let chartTitle = `${element.name} Score Distribution - Cycle ${cycle} (n=${totalResponses})`;
 
-            log(`For ${element.name} Distribution - ${comparisonLabel} Avg: ${nationalAverageForElement}`);
+            log(`For ${element.name} Distribution - ${comparisonLabel} Avg: ${nationalAverageForElement}, Responses: ${totalResponses}`);
 
             // Create chart wrapper element
             const chartWrapper = document.createElement('div');
@@ -5761,6 +5845,36 @@ function initializeDashboardApp() {
             
             if (res.ok) {
                 const batchResults = await res.json();
+                
+                // Check for filter warnings
+                if (batchResults._warnings && batchResults._warnings.length > 0) {
+                    const warningMessage = batchResults._warnings.join('. ');
+                    
+                    // Display warning at the top of QLA section
+                    const qlaSection = document.getElementById('qla-section');
+                    if (qlaSection) {
+                        const existingWarning = qlaSection.querySelector('.qla-filter-warning');
+                        if (existingWarning) {
+                            existingWarning.remove();
+                        }
+                        
+                        const warningDiv = document.createElement('div');
+                        warningDiv.className = 'qla-filter-warning';
+                        warningDiv.style.cssText = 'background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 10px 15px; margin: 10px 0; display: flex; align-items: center; color: #856404;';
+                        warningDiv.innerHTML = `
+                            <i class="fas fa-info-circle" style="margin-right: 10px;"></i>
+                            <span>${warningMessage}</span>
+                        `;
+                        
+                        // Insert after the section header
+                        const sectionHeader = qlaSection.querySelector('h2');
+                        if (sectionHeader) {
+                            sectionHeader.insertAdjacentElement('afterend', warningDiv);
+                        } else {
+                            qlaSection.insertBefore(warningDiv, qlaSection.firstChild);
+                        }
+                    }
+                }
                 
                 // Map results back to insights
                 const insights = insightQuestions.map(insight => ({
@@ -7307,15 +7421,23 @@ function initializeDashboardApp() {
         } else {
             errorLog("Neither Staff Admin nor Super User role found. Cannot load dashboard.");
             GlobalLoader.hide();
-            document.getElementById('overview-section').innerHTML = "<p>Cannot load dashboard: Your account does not have the required Staff Admin or Super User role.</p>";
-            document.getElementById('qla-section').innerHTML = "<p>Cannot load dashboard: Your account does not have the required Staff Admin or Super User role.</p>";
-            document.getElementById('student-insights-section').innerHTML = "<p>Cannot load dashboard: Your account does not have the required Staff Admin or Super User role.</p>";
+            return;
         }
     }
-    
-    initializeFullDashboard(); // Call the main async initialization function
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeFullDashboard);
+    } else {
+        initializeFullDashboard();
+    }
 }
 
+// Initialize the dashboard app
+window.addEventListener('load', () => {
+    console.log('Window loaded, initializing dashboard app');
+    initializeDashboardApp();
+});
 // Defensive check: If jQuery is used by Knack/other scripts, ensure this script runs after.
 // However, the loader script (WorkingBridge.js) should handle calling initializeDashboardApp
 // at the appropriate time.
@@ -7384,4 +7506,6 @@ window.testSelectFirstOption = function() {
     }
 };
 
+} // End of initializeDashboardApp function
 
+}); // Close DOMContentLoaded if statement
