@@ -7507,4 +7507,4 @@ window.testSelectFirstOption = function() {
 };
 
 } // End of initializeDashboardApp function
-
+}
