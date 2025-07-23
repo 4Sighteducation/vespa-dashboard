@@ -7508,4 +7508,3 @@ window.testSelectFirstOption = function() {
 
 } // End of initializeDashboardApp function
 
-}); // Close DOMContentLoaded if statement
