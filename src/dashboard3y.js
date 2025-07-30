@@ -53,61 +53,6 @@ const GlobalLoader = {
     },
     
     updateProgress(percentage, text) {
-// dashboard2x.js
-// @ts-nocheck
-
-// lobal loader management
-if (window.VESPA_DASHBOARD_LOADED) {
-    console.log('VESPA Dashboard script already loaded');
-    // Already loaded, do not initialize again
-} else {
-    window.VESPA_DASHBOARD_LOADED = true;
-}
-
-const GlobalLoader = {
-    overlay: null,
-    progressBar: null,
-    progressText: null,
-    
-    init() {
-        // Remove any existing loader first
-        const existing = document.getElementById('global-loading-overlay');
-        if (existing) {
-            existing.remove();
-        }
-        
-        // Create loader HTML immediately
-        const loaderHTML = `
-            <div class="global-loading-overlay active" id="global-loading-overlay" style="z-index: 999999 !important;">
-                <div class="loading-content">
-                    <div class="spinner"></div>
-                    <div class="loading-text">Initializing VESPA Dashboard</div>
-                    <div class="loading-subtext">Loading your performance data...</div>
-                    <div class="loading-progress">
-                        <div class="loading-progress-bar" id="loading-progress-bar"></div>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        // Insert at the end of body to ensure it's on top of everything
-        document.body.insertAdjacentHTML('beforeend', loaderHTML);
-        
-        this.overlay = document.getElementById('global-loading-overlay');
-        this.progressBar = document.getElementById('loading-progress-bar');
-        this.progressText = this.overlay.querySelector('.loading-subtext');
-        
-        // Force the overlay to the top by ensuring proper z-index
-        if (this.overlay) {
-            this.overlay.style.position = 'fixed';
-            this.overlay.style.top = '0';
-            this.overlay.style.left = '0';
-            this.overlay.style.width = '100%';
-            this.overlay.style.height = '100%';
-        }
-    },
-    
-    updateProgress(percentage, text) {
         if (this.progressBar) {
             this.progressBar.style.width = `${percentage}%`;
         }
@@ -7431,31 +7376,14 @@ function initializeDashboardApp() {
     } else {
         initializeFullDashboard();
     }
-}
-
-// Initialize the dashboard app
-window.addEventListener('load', () => {
-    console.log('Window loaded, initializing dashboard app');
-    initializeDashboardApp();
-});
-// Defensive check: If jQuery is used by Knack/other scripts, ensure this script runs after.
-// However, the loader script (WorkingBridge.js) should handle calling initializeDashboardApp
-// at the appropriate time.
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        // initializeDashboardApp(); // Not strictly necessary if WorkingBridge calls it
-    });
-} else {
-    // initializeDashboardApp(); // Or call if DOM is already ready, though WorkingBridge is preferred.
-}
 
     // Make sure initializeDashboardApp is globally accessible if WorkingBridge.js calls it.
 // If it's not already, you might need:
 // window.initializeDashboardApp = initializeDashboardApp;
 // However, since it's a top-level function in the script, it should be.
 
-// Debug function to test modal buttons (remove after testing)
-window.testAnalysisModal = function() {
+    // Debug function to test modal buttons (remove after testing)
+    window.testAnalysisModal = function() {
     console.log('Testing analysis modal...');
     const modal = document.getElementById('analysis-type-modal');
     const continueBtn = document.getElementById('analysis-continue-btn');
@@ -7480,11 +7408,11 @@ window.testAnalysisModal = function() {
     const radios = document.querySelectorAll('input[name="analysis-type"]');
     console.log('Radio buttons found:', radios.length);
     
-    return { modal, continueBtn, cancelBtn, radios };
-};
+        return { modal, continueBtn, cancelBtn, radios };
+    };
 
-// Test function to simulate selecting the first radio button
-window.testSelectFirstOption = function() {
+    // Test function to simulate selecting the first radio button
+    window.testSelectFirstOption = function() {
     const firstRadio = document.querySelector('input[name="analysis-type"]');
     if (firstRadio) {
         console.log('Selecting first radio button:', firstRadio.value);
@@ -7501,10 +7429,26 @@ window.testSelectFirstOption = function() {
         if (continueBtn) {
             console.log('Continue button disabled after selection:', continueBtn.disabled);
         }
-    } else {
-        console.log('No radio buttons found');
-    }
-};
+        } else {
+            console.log('No radio buttons found');
+        }
+    };
 
 } // End of initializeDashboardApp function
+
+// Initialize the dashboard app
+window.addEventListener('load', () => {
+    console.log('Window loaded, initializing dashboard app');
+    initializeDashboardApp();
+});
+
+// Defensive check: If jQuery is used by Knack/other scripts, ensure this script runs after.
+// However, the loader script (WorkingBridge.js) should handle calling initializeDashboardApp
+// at the appropriate time.
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        // initializeDashboardApp(); // Not strictly necessary if WorkingBridge calls it
+    });
+} else {
+    // initializeDashboardApp(); // Or call if DOM is already ready, though WorkingBridge is preferred.
 }
