@@ -306,26 +306,60 @@ function initializeDashboardApp() {
     // These will typically use your Heroku app as a proxy to securely call the Knack API.
     // Example:
     async function fetchDataFromKnack(objectKey, filters = [], options = {}) {
-        // Fast-path: if the request is for VESPA results and we already have them cached from
-        // the /dashboard-initial-data batch call, return the cached set (optionally filtered)
-        // instead of making a round-trip to the backend.
-
-        if (objectKey === (objectKeys?.vespaResults || 'object_10')) {
-            const cached = DataCache.get('vespaResults');
-            if (cached && Array.isArray(cached)) {
-                // If no server-side filters requested just return the whole set
-                if (!filters || filters.length === 0) {
-                    log('fetchDataFromKnack: served VESPA results from cache', { count: cached.length });
-                    return cached;
+        // Redirect to Supabase endpoints for common object keys
+        console.log(`fetchDataFromKnack called for ${objectKey}`);
+        
+        // Map object keys to Supabase endpoints
+        switch(objectKey) {
+            case 'object_2': // establishments
+                console.log('Fetching schools from Supabase');
+                const schoolsUrl = `${config.herokuAppUrl}/api/schools`;
+                try {
+                    const response = await fetch(schoolsUrl);
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch schools: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    return data;
+                } catch (error) {
+                    errorLog('Failed to fetch schools', error);
+                    throw error;
                 }
-
-                // Apply simple filter logic locally so we still respect the caller's intent.
-                const filtered = applyFiltersToRecords(cached, filters);
-                log('fetchDataFromKnack: served filtered VESPA results from cache', { requestedFilters: filters, count: filtered.length });
-                return filtered;
-            }
+                
+            case 'object_10': // VESPA results
+                // For VESPA results, we should use the school statistics endpoint
+                console.warn('VESPA results should be fetched via school statistics');
+                // Check cache first
+                const cached = DataCache.get('vespaResults');
+                if (cached && Array.isArray(cached)) {
+                    if (!filters || filters.length === 0) {
+                        log('fetchDataFromKnack: served VESPA results from cache', { count: cached.length });
+                        return cached;
+                    }
+                    const filtered = applyFiltersToRecords(cached, filters);
+                    log('fetchDataFromKnack: served filtered VESPA results from cache', { requestedFilters: filters, count: filtered.length });
+                    return filtered;
+                }
+                // Fall back to old endpoint if not cached
+                break;
+                
+            case 'object_120': // national data
+                console.log('Fetching national statistics from Supabase');
+                const nationalUrl = `${config.herokuAppUrl}/api/national-statistics`;
+                try {
+                    const response = await fetch(nationalUrl);
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch national statistics: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    return data;
+                } catch (error) {
+                    errorLog('Failed to fetch national statistics', error);
+                    throw error;
+                }
         }
-
+        
+        // For other object keys, fall back to old Knack endpoint
         let url = `${config.herokuAppUrl}/api/knack-data?objectKey=${objectKey}&filters=${encodeURIComponent(JSON.stringify(filters))}`;
         
         // Append options to URL if they exist
@@ -362,7 +396,7 @@ function initializeDashboardApp() {
         }
     }
     
-    // New batch data fetching function
+    // New batch data fetching function - Updated for Supabase
     async function fetchDashboardInitialData(staffAdminId, establishmentId, cycle = 1, forceRefresh = false) {
         // Check cache first (unless force refresh)
         if (!forceRefresh) {
@@ -396,47 +430,101 @@ function initializeDashboardApp() {
         
         DataCache.isLoading = true;
         
-        const url = `${config.herokuAppUrl}/api/dashboard-initial-data`;
-        const requestData = {
-            staffAdminId,
-            establishmentId,
-            cycle,
-            forceRefresh
-        };
-        
-        log("Fetching dashboard initial data from batch endpoint:", requestData);
+        log("Fetching dashboard data from Supabase backend", { establishmentId, cycle });
         
         try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(requestData)
-            });
-            
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: `Batch data request failed with status ${response.status}` }));
-                throw new Error(errorData.message || `Batch data request failed with status ${response.status}`);
+            // If establishmentId is provided, use Supabase endpoints
+            if (establishmentId) {
+                // Fetch school statistics
+                const schoolStatsUrl = `${config.herokuAppUrl}/api/statistics/${establishmentId}?cycle=${cycle}`;
+                const schoolStatsResponse = await fetch(schoolStatsUrl);
+                if (!schoolStatsResponse.ok) {
+                    throw new Error(`Failed to fetch school statistics: ${schoolStatsResponse.status}`);
+                }
+                const schoolStats = await schoolStatsResponse.json();
+                
+                // Fetch national statistics
+                const nationalStatsUrl = `${config.herokuAppUrl}/api/national-statistics?cycle=${cycle}`;
+                const nationalStatsResponse = await fetch(nationalStatsUrl);
+                if (!nationalStatsResponse.ok) {
+                    throw new Error(`Failed to fetch national statistics: ${nationalStatsResponse.status}`);
+                }
+                const nationalStats = await nationalStatsResponse.json();
+                
+                // Fetch questions
+                const questionsUrl = `${config.herokuAppUrl}/api/questions`;
+                const questionsResponse = await fetch(questionsUrl);
+                if (!questionsResponse.ok) {
+                    throw new Error(`Failed to fetch questions: ${questionsResponse.status}`);
+                }
+                const questions = await questionsResponse.json();
+                
+                // Format response to match expected structure
+                const data = {
+                    schoolStatistics: schoolStats,
+                    nationalStatistics: nationalStats,
+                    questions: questions,
+                    vespaResults: schoolStats, // For compatibility
+                    nationalBenchmark: nationalStats, // For compatibility
+                    cycle: cycle,
+                    establishmentId: establishmentId
+                };
+                
+                // Cache the data
+                const cacheData = {
+                    ...data,
+                    cycle,
+                    staffAdminId,
+                    establishmentId
+                };
+                DataCache.set('initialData', cacheData);
+                DataCache.set('schoolStatistics', schoolStats);
+                DataCache.set('nationalStatistics', nationalStats);
+                DataCache.set('questions', questions);
+                
+                DataCache.isLoading = false;
+                return data;
+            } else {
+                // Fall back to old endpoint if no establishment ID
+                const url = `${config.herokuAppUrl}/api/dashboard-initial-data`;
+                const requestData = {
+                    staffAdminId,
+                    establishmentId,
+                    cycle,
+                    forceRefresh
+                };
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ message: `Batch data request failed with status ${response.status}` }));
+                    throw new Error(errorData.message || `Batch data request failed with status ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Cache the data
+                const cacheData = {
+                    ...data,
+                    cycle,
+                    staffAdminId,
+                    establishmentId
+                };
+                DataCache.set('initialData', cacheData);
+                DataCache.set('vespaResults', data.vespaResults);
+                DataCache.set('nationalBenchmark', data.nationalBenchmark);
+                DataCache.set('filterOptions', data.filterOptions);
+                DataCache.set('psychometricResponses', data.psychometricResponses);
+                
+                DataCache.isLoading = false;
+                return data;
             }
-            
-            const data = await response.json();
-            
-            // Cache the data
-            const cacheData = {
-                ...data,
-                cycle,
-                staffAdminId,
-                establishmentId
-            };
-            DataCache.set('initialData', cacheData);
-            DataCache.set('vespaResults', data.vespaResults);
-            DataCache.set('nationalBenchmark', data.nationalBenchmark);
-            DataCache.set('filterOptions', data.filterOptions);
-            DataCache.set('psychometricResponses', data.psychometricResponses);
-            
-            DataCache.isLoading = false;
-            return data;
         } catch (error) {
             DataCache.isLoading = false;
             errorLog("Failed to fetch dashboard initial data", error);
@@ -473,27 +561,40 @@ function initializeDashboardApp() {
         }
     }
 
-    // New function to get all unique establishments
+    // New function to get all unique establishments - Updated for Supabase
     async function getAllEstablishments() {
         try {
-            log("Fetching establishments from object_2 endpoint");
+            log("Fetching schools from Supabase backend");
             
-            // Use the establishments endpoint that fetches from object_2
-            const url = `${config.herokuAppUrl}/api/establishments`;
-            log("Fetching from establishments endpoint:", url);
+            // Use the new Supabase schools endpoint
+            const url = `${config.herokuAppUrl}/api/schools`;
+            log("Fetching from Supabase schools endpoint:", url);
             
             const response = await fetch(url);
             if (!response.ok) {
-                throw new Error(`Failed to fetch establishments: ${response.status}`);
+                throw new Error(`Failed to fetch schools: ${response.status}`);
             }
             
             const data = await response.json();
-            log(`Fetched ${data.total} establishments from ${data.source_object}`);
+            log(`Fetched ${data.length} schools from Supabase`);
             
-            return data.establishments || [];
+            // Map the data to match expected format
+            // Supabase returns array directly, not wrapped in object
+            return data || [];
             
         } catch (error) {
-            errorLog("Failed to fetch establishments", error);
+            errorLog("Failed to fetch schools from Supabase", error);
+            // Fall back to old endpoint if Supabase fails
+            try {
+                const fallbackUrl = `${config.herokuAppUrl}/api/establishments`;
+                const fallbackResponse = await fetch(fallbackUrl);
+                if (fallbackResponse.ok) {
+                    const fallbackData = await fallbackResponse.json();
+                    return fallbackData.establishments || [];
+                }
+            } catch (fallbackError) {
+                errorLog("Fallback to old endpoint also failed", fallbackError);
+            }
             return [];
         }
     }
@@ -1510,7 +1611,7 @@ function initializeDashboardApp() {
                 <header>
                     <h1>VESPA Performance Dashboard</h1>
                 </header>
-                <section id="overview-section" style="${showSuperUserControls ? 'display: none;' : ''}">
+                <section id="overview-section">
                     <div class="overview-header">
                         <h2>School Overview & Benchmarking</h2>
                         <div class="data-health-indicator" id="data-health-indicator" style="display: none;">
@@ -1628,7 +1729,7 @@ function initializeDashboardApp() {
                         </div>
                     </div>
                 </section>
-                <section id="qla-section" style="${showSuperUserControls ? 'display: none;' : ''}">
+                <section id="qla-section">
                     <h2>Question Level Analysis</h2>
                     <div id="qla-top-bottom-questions">
                         <!-- Top and bottom questions will be rendered here -->
@@ -1643,7 +1744,7 @@ function initializeDashboardApp() {
                         <!-- Pre-calculated insights will be rendered here -->
                     </div>
                 </section>
-                <section id="student-insights-section" style="${showSuperUserControls ? 'display: none;' : ''}">
+                <section id="student-insights-section">
                     <h2>Student Comment Insights</h2>
                     <div id="word-cloud-container"></div>
                     <div id="common-themes-container"></div>
@@ -3183,74 +3284,136 @@ function initializeDashboardApp() {
     // --- Section 1: Overview and Benchmarking ---
     // --- ERI (Exam Readiness Index) Functions ---
     async function calculateSchoolERI(staffAdminId, cycle, additionalFilters = [], establishmentId = null) {
-        log(`Fetching School ERI for Cycle ${cycle} from backend`);
+        log(`Calculating School ERI for Cycle ${cycle} using Supabase data`);
+        
+        if (!establishmentId) {
+            log("Establishment ID required for ERI calculation with Supabase");
+            return null;
+        }
         
         try {
-            // Build URL with parameters
-            let url = `${config.herokuAppUrl}/api/calculate-eri?cycle=${cycle}`;
+            // Get school statistics from Supabase
+            const statsUrl = `${config.herokuAppUrl}/api/statistics/${establishmentId}?cycle=${cycle}`;
+            log("Fetching school statistics from Supabase:", statsUrl);
             
-            if (establishmentId) {
-                url += `&establishmentId=${establishmentId}`;
-            } else if (staffAdminId) {
-                url += `&staffAdminId=${staffAdminId}`;
-            } else {
-                log("No Staff Admin ID or Establishment ID provided for ERI calculation");
-                return null;
-            }
-            
-            // Note: Additional filters would need to be handled server-side if needed
-            // For now, the backend calculates ERI for all records matching the establishment/staff admin
-            
-            const response = await fetch(url);
+            const response = await fetch(statsUrl);
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: `ERI calculation failed with status ${response.status}` }));
-                throw new Error(errorData.message || `ERI calculation failed with status ${response.status}`);
+                throw new Error(`Failed to fetch school statistics: ${response.status}`);
             }
             
-            const data = await response.json();
+            const stats = await response.json();
             
-            if (data.school_eri === null || data.school_eri === undefined) {
-                log("No ERI data returned from backend");
-                return null;
+            // Calculate ERI from VESPA means
+            if (stats && stats.length > 0) {
+                const vespaElements = ['vision', 'effort', 'systems', 'practice', 'attitude'];
+                let totalMean = 0;
+                let count = 0;
+                let responseCount = 0;
+                
+                stats.forEach(stat => {
+                    if (stat.cycle === cycle && vespaElements.includes(stat.element)) {
+                        totalMean += stat.mean || 0;
+                        count++;
+                        responseCount = Math.max(responseCount, stat.count || 0);
+                    }
+                });
+                
+                if (count === 5) {
+                    const eri = totalMean / count;
+                    log(`Calculated School ERI: ${eri} from ${responseCount} responses`);
+                    return {
+                        value: Math.round(eri * 100) / 100,
+                        responseCount: responseCount
+                    };
+                }
             }
             
-            log(`Received School ERI: ${data.school_eri} from ${data.response_count} responses`);
-            
-            return {
-                value: data.school_eri,
-                responseCount: data.response_count
-            };
+            log("Insufficient data to calculate ERI");
+            return null;
             
         } catch (error) {
-            errorLog("Failed to fetch school ERI from backend", error);
+            errorLog("Failed to calculate school ERI from Supabase", error);
+            // Fall back to old endpoint
+            try {
+                let fallbackUrl = `${config.herokuAppUrl}/api/calculate-eri?cycle=${cycle}`;
+                if (establishmentId) {
+                    fallbackUrl += `&establishmentId=${establishmentId}`;
+                } else if (staffAdminId) {
+                    fallbackUrl += `&staffAdminId=${staffAdminId}`;
+                }
+                
+                const fallbackResponse = await fetch(fallbackUrl);
+                if (fallbackResponse.ok) {
+                    const data = await fallbackResponse.json();
+                    if (data.school_eri !== null && data.school_eri !== undefined) {
+                        return {
+                            value: data.school_eri,
+                            responseCount: data.response_count
+                        };
+                    }
+                }
+            } catch (fallbackError) {
+                errorLog("Fallback ERI calculation also failed", fallbackError);
+            }
             return null;
         }
     }
     
     async function getNationalERI(cycle) {
-        log(`Fetching National ERI for Cycle ${cycle} from backend`);
+        log(`Calculating National ERI for Cycle ${cycle} using Supabase data`);
         
         try {
-            const url = `${config.herokuAppUrl}/api/national-eri?cycle=${cycle}`;
+            // Get national statistics from Supabase
+            const nationalUrl = `${config.herokuAppUrl}/api/national-statistics?cycle=${cycle}`;
+            log("Fetching national statistics from Supabase:", nationalUrl);
             
-            const response = await fetch(url);
+            const response = await fetch(nationalUrl);
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: `National ERI fetch failed with status ${response.status}` }));
-                throw new Error(errorData.message || `National ERI fetch failed with status ${response.status}`);
+                throw new Error(`Failed to fetch national statistics: ${response.status}`);
             }
             
-            const data = await response.json();
+            const nationalStats = await response.json();
             
-            log(`Received National ERI: ${data.national_eri} (${data.source})`);
-            if (data.message) {
-                log(`National ERI message: ${data.message}`);
+            // Calculate ERI from national VESPA means
+            if (nationalStats && nationalStats.length > 0) {
+                const vespaElements = ['vision', 'effort', 'systems', 'practice', 'attitude'];
+                let totalMean = 0;
+                let count = 0;
+                
+                nationalStats.forEach(stat => {
+                    if (stat.cycle === cycle && vespaElements.includes(stat.element)) {
+                        totalMean += stat.mean || 0;
+                        count++;
+                    }
+                });
+                
+                if (count === 5) {
+                    const nationalERI = totalMean / count;
+                    log(`Calculated National ERI: ${nationalERI} from Supabase data`);
+                    return Math.round(nationalERI * 100) / 100;
+                }
             }
             
-            return data.national_eri;
+            log("Insufficient national data to calculate ERI, using default");
+            return 3.5; // Default fallback
             
         } catch (error) {
-            errorLog("Failed to fetch national ERI from backend", error);
-            // Return fallback value
+            errorLog("Failed to calculate national ERI from Supabase", error);
+            // Fall back to old endpoint
+            try {
+                const fallbackUrl = `${config.herokuAppUrl}/api/national-eri?cycle=${cycle}`;
+                const fallbackResponse = await fetch(fallbackUrl);
+                if (fallbackResponse.ok) {
+                    const data = await fallbackResponse.json();
+                    if (data.national_eri) {
+                        log(`Using fallback National ERI: ${data.national_eri}`);
+                        return data.national_eri;
+                    }
+                }
+            } catch (fallbackError) {
+                errorLog("Fallback national ERI also failed", fallbackError);
+            }
+            // Return default fallback value
             return 3.5;
         }
     }
@@ -3729,55 +3892,117 @@ function initializeDashboardApp() {
                 }
             }
             
-            let schoolVespaResults = batchData.vespaResults || [];
-            let nationalBenchmarkRecord = batchData.nationalBenchmark;
+            // Check if we have Supabase statistics data
+            let schoolStatistics = batchData.schoolStatistics;
+            let nationalStatistics = batchData.nationalStatistics;
             
-            // Apply additional filters if any
-            if (additionalFilters && additionalFilters.length > 0) {
-                schoolVespaResults = applyFiltersToRecords(schoolVespaResults, additionalFilters);
-                log(`Applied additional filters, results: ${schoolVespaResults.length}`);
-            }
+            let schoolAverages = { vision: 0, effort: 0, systems: 0, practice: 0, attitude: 0, overall: 0 };
+            let nationalAverages = { vision: 0, effort: 0, systems: 0, practice: 0, attitude: 0, overall: 0 };
+            let nationalDistributions = null;
             
             GlobalLoader.updateProgress(60, 'Processing VESPA scores...');
             
-            const schoolAverages = calculateSchoolVespaAverages(schoolVespaResults, cycle);
-            log(`School Averages (Cycle ${cycle}):`, schoolAverages);
-
-            let nationalAverages = { vision: 0, effort: 0, systems: 0, practice: 0, attitude: 0, overall: 0 };
-            let nationalDistributions = null; // Will hold parsed JSON distribution data
-            
-            if (nationalBenchmarkRecord) {
-                nationalAverages = getNationalVespaAveragesFromRecord(nationalBenchmarkRecord, cycle);
-                log("Processed National Averages for charts:", nationalAverages);
+            if (schoolStatistics && schoolStatistics.length > 0) {
+                // Use Supabase statistics
+                log("Using Supabase school statistics for averages");
+                const vespaElements = ['vision', 'effort', 'systems', 'practice', 'attitude', 'overall'];
                 
-                // Parse national distribution JSON data
-                const distributionFieldMap = {
-                    1: 'field_3409', // distribution_json_cycle1
-                    2: 'field_3410', // distribution_json_cycle2
-                    3: 'field_3411'  // distribution_json_cycle3
-                };
-                
-                const distributionField = distributionFieldMap[cycle];
-                if (distributionField && nationalBenchmarkRecord[distributionField + '_raw']) {
-                    try {
-                        nationalDistributions = JSON.parse(nationalBenchmarkRecord[distributionField + '_raw']);
-                        log(`Parsed National Distribution data for Cycle ${cycle}:`, nationalDistributions);
-                    } catch (e) {
-                        errorLog(`Failed to parse national distribution JSON for cycle ${cycle}:`, e);
+                schoolStatistics.forEach(stat => {
+                    if (stat.cycle === cycle && vespaElements.includes(stat.element)) {
+                        schoolAverages[stat.element] = stat.mean || 0;
                     }
+                });
+                log(`School Averages from Supabase (Cycle ${cycle}):`, schoolAverages);
+                
+                // Extract distributions for national data
+                if (nationalStatistics && nationalStatistics.length > 0) {
+                    nationalDistributions = {};
+                    nationalStatistics.forEach(stat => {
+                        if (stat.cycle === cycle && vespaElements.includes(stat.element)) {
+                            nationalAverages[stat.element] = stat.mean || 0;
+                            if (stat.distribution) {
+                                nationalDistributions[stat.element] = stat.distribution;
+                            }
+                        }
+                    });
+                    log("National Averages from Supabase:", nationalAverages);
+                    log("National Distributions from Supabase:", nationalDistributions);
                 }
             } else {
-                log("National benchmark record was null, nationalAverages will be default/empty.");
+                // Fall back to old calculation method
+                log("Falling back to legacy VESPA calculation");
+                let schoolVespaResults = batchData.vespaResults || [];
+                let nationalBenchmarkRecord = batchData.nationalBenchmark;
+                
+                // Apply additional filters if any
+                if (additionalFilters && additionalFilters.length > 0) {
+                    schoolVespaResults = applyFiltersToRecords(schoolVespaResults, additionalFilters);
+                    log(`Applied additional filters, results: ${schoolVespaResults.length}`);
+                }
+                
+                schoolAverages = calculateSchoolVespaAverages(schoolVespaResults, cycle);
+                log(`School Averages (Legacy Calc - Cycle ${cycle}):`, schoolAverages);
+                
+                if (nationalBenchmarkRecord) {
+                    nationalAverages = getNationalVespaAveragesFromRecord(nationalBenchmarkRecord, cycle);
+                    log("Processed National Averages (Legacy):", nationalAverages);
+                    
+                    // Parse national distribution JSON data
+                    const distributionFieldMap = {
+                        1: 'field_3409', // distribution_json_cycle1
+                        2: 'field_3410', // distribution_json_cycle2
+                        3: 'field_3411'  // distribution_json_cycle3
+                    };
+                    
+                    const distributionField = distributionFieldMap[cycle];
+                    if (distributionField && nationalBenchmarkRecord[distributionField + '_raw']) {
+                        try {
+                            nationalDistributions = JSON.parse(nationalBenchmarkRecord[distributionField + '_raw']);
+                            log(`Parsed National Distribution data for Cycle ${cycle}:`, nationalDistributions);
+                        } catch (e) {
+                            errorLog(`Failed to parse national distribution JSON for cycle ${cycle}:`, e);
+                        }
+                    }
+                } else {
+                    log("National benchmark record was null, nationalAverages will be default/empty.");
+                }
             }
             
             GlobalLoader.updateProgress(70, 'Calculating statistics...');
             
-            // Update response statistics using cached data
-            // Pass both unfiltered and filtered data for accurate counts
-            const unfilteredResults = batchData.vespaResults || [];
-            updateResponseStatsFromCache(unfilteredResults, additionalFilters.length > 0 ? schoolVespaResults : null, cycle);
+            // Update response statistics
+            if (schoolStatistics && schoolStatistics.length > 0) {
+                // For Supabase, extract response counts from statistics
+                let totalResponses = 0;
+                let uniqueStudents = 0;
+                schoolStatistics.forEach(stat => {
+                    if (stat.cycle === cycle && stat.element === 'overall') {
+                        totalResponses = stat.count || 0;
+                        uniqueStudents = stat.count || 0; // Assuming count is unique students
+                    }
+                });
+                
+                // Update stats display directly
+                const statsCard = document.querySelector('.response-stats-card');
+                if (statsCard) {
+                    const totalSpan = statsCard.querySelector('#total-responses');
+                    const uniqueSpan = statsCard.querySelector('#unique-students');
+                    const rateSpan = statsCard.querySelector('#completion-rate');
+                    
+                    if (totalSpan) totalSpan.textContent = totalResponses.toLocaleString();
+                    if (uniqueSpan) uniqueSpan.textContent = uniqueStudents.toLocaleString();
+                    if (rateSpan && uniqueStudents > 0) {
+                        const rate = Math.round((totalResponses / uniqueStudents) * 100);
+                        rateSpan.textContent = `${rate}%`;
+                    }
+                }
+            } else {
+                // Legacy: Update response statistics using cached data
+                const unfilteredResults = batchData.vespaResults || [];
+                updateResponseStatsFromCache(unfilteredResults, additionalFilters.length > 0 ? schoolVespaResults : null, cycle);
+            }
             
-            // Fetch ERI values (batch may not include them for large schools)
+            // Fetch ERI values
             let schoolERI = batchData.schoolERI;
             let nationalERI = batchData.nationalERI;
 
@@ -3793,7 +4018,10 @@ function initializeDashboardApp() {
             
             renderERISpeedometer(schoolERI, nationalERI, cycle);
             renderAveragesChart(schoolAverages, nationalAverages, cycle);
-            renderDistributionCharts(schoolVespaResults, nationalAverages, themeColors, cycle, nationalDistributions);
+            
+            // For distribution charts, we need school results or can pass empty array for Supabase
+            const schoolResultsForCharts = batchData.vespaResults || [];
+            renderDistributionCharts(schoolResultsForCharts, nationalAverages, themeColors, cycle, nationalDistributions);
 
         } catch (error) {
             errorLog("Failed to load overview data", error);
@@ -7095,18 +7323,14 @@ function initializeDashboardApp() {
             errorLog("Error checking Staff Admin status:", e);
         }
 
-        // Only check Super User status if not already a Staff Admin
-        if (!isStaffAdmin) {
-            const checkSuperUser = await checkSuperUserStatus(loggedInUserEmail);
-            if (checkSuperUser) {
-                superUserRecordId = checkSuperUser;
-                isSuperUser = true;
-                log("User is a Super User!");
-            } else {
-                log("User is NOT a Super User.");
-            }
+        // Always check Super User status (Staff Admins can also be Super Users)
+        const checkSuperUser = await checkSuperUserStatus(loggedInUserEmail);
+        if (checkSuperUser) {
+            superUserRecordId = checkSuperUser;
+            isSuperUser = true;
+            log("User is a Super User!");
         } else {
-             log("User is a Staff Admin, skipping Super User check for primary role determination.");
+            log("User is NOT a Super User.");
         }
 
         renderDashboardUI(targetElement, isSuperUser); // Render main structure with Super User controls if applicable
