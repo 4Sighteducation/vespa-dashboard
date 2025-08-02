@@ -301,6 +301,320 @@ function initializeDashboardApp() {
         console.error(`[Dashboard App ERROR] ${message}`, error);
     }
 
+    // --- Supabase API Communication Layer ---
+    // This replaces direct Knack calls with Supabase-backed endpoints
+    const API = {
+        // Get configuration from window object
+        getConfig() {
+            return window.DASHBOARD_CONFIG || {
+                herokuAppUrl: 'https://vespa-dashboard-9a1f84ee5341.herokuapp.com'
+            };
+        },
+
+        // Helper to handle API errors
+        async handleResponse(response) {
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ 
+                    message: `API request failed with status ${response.status}` 
+                }));
+                throw new Error(errorData.message || `API request failed with status ${response.status}`);
+            }
+            return response.json();
+        },
+
+        // Get all schools/establishments
+        async getSchools() {
+            const config = this.getConfig();
+            const url = `${config.herokuAppUrl}/api/schools`;
+            
+            console.log("Fetching schools from Supabase backend");
+            
+            try {
+                const response = await fetch(url);
+                return await this.handleResponse(response);
+            } catch (error) {
+                console.error("Failed to fetch schools", error);
+                throw error;
+            }
+        },
+
+        // Get school statistics
+        async getSchoolStatistics(schoolId, cycle = null, academicYear = null) {
+            const config = this.getConfig();
+            let url = `${config.herokuAppUrl}/api/statistics/${schoolId}`;
+            
+            const params = new URLSearchParams();
+            if (cycle) params.append('cycle', cycle);
+            if (academicYear) params.append('academic_year', academicYear);
+            
+            if (params.toString()) {
+                url += `?${params.toString()}`;
+            }
+            
+            console.log("Fetching school statistics from Supabase:", url);
+            
+            try {
+                const response = await fetch(url);
+                return await this.handleResponse(response);
+            } catch (error) {
+                console.error("Failed to fetch school statistics", error);
+                throw error;
+            }
+        },
+
+        // Get national statistics
+        async getNationalStatistics(cycle = null, academicYear = null) {
+            const config = this.getConfig();
+            let url = `${config.herokuAppUrl}/api/national-statistics`;
+            
+            const params = new URLSearchParams();
+            if (cycle) params.append('cycle', cycle);
+            if (academicYear) params.append('academic_year', academicYear);
+            
+            if (params.toString()) {
+                url += `?${params.toString()}`;
+            }
+            
+            console.log("Fetching national statistics from Supabase");
+            
+            try {
+                const response = await fetch(url);
+                return await this.handleResponse(response);
+            } catch (error) {
+                console.error("Failed to fetch national statistics", error);
+                throw error;
+            }
+        },
+
+        // Get Question Level Analysis data
+        async getQLAData(filters = {}) {
+            const config = this.getConfig();
+            const url = `${config.herokuAppUrl}/api/qla-data`;
+            
+            console.log("Fetching QLA data from Supabase", filters);
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(filters)
+                });
+                return await this.handleResponse(response);
+            } catch (error) {
+                console.error("Failed to fetch QLA data", error);
+                throw error;
+            }
+        },
+
+        // Get current school averages
+        async getCurrentAverages(establishmentId = null) {
+            const config = this.getConfig();
+            let url = `${config.herokuAppUrl}/api/current-averages`;
+            
+            if (establishmentId) {
+                url += `?establishment_id=${establishmentId}`;
+            }
+            
+            console.log("Fetching current averages from Supabase");
+            
+            try {
+                const response = await fetch(url);
+                return await this.handleResponse(response);
+            } catch (error) {
+                console.error("Failed to fetch current averages", error);
+                throw error;
+            }
+        },
+
+        // Get trust statistics
+        async getTrustStatistics(trustId, cycle = null) {
+            const config = this.getConfig();
+            let url = `${config.herokuAppUrl}/api/trust/${trustId}/statistics`;
+            
+            if (cycle) {
+                url += `?cycle=${cycle}`;
+            }
+            
+            console.log("Fetching trust statistics from Supabase");
+            
+            try {
+                const response = await fetch(url);
+                return await this.handleResponse(response);
+            } catch (error) {
+                console.error("Failed to fetch trust statistics", error);
+                throw error;
+            }
+        },
+
+        // Get questions metadata
+        async getQuestions(category = null, active = true) {
+            const config = this.getConfig();
+            let url = `${config.herokuAppUrl}/api/questions`;
+            
+            const params = new URLSearchParams();
+            if (category) params.append('category', category);
+            params.append('active', active);
+            
+            url += `?${params.toString()}`;
+            
+            console.log("Fetching questions from Supabase");
+            
+            try {
+                const response = await fetch(url);
+                return await this.handleResponse(response);
+            } catch (error) {
+                console.error("Failed to fetch questions", error);
+                throw error;
+            }
+        },
+
+        // Legacy support - redirect old Knack calls to new endpoints
+        async fetchDataFromKnack(objectKey, filters = [], options = {}) {
+            console.warn(`Legacy Knack call detected for ${objectKey}, redirecting to Supabase`);
+            
+            // Map old object keys to new API calls
+            switch(objectKey) {
+                case 'object_2': // establishments
+                    return await this.getSchools();
+                
+                case 'object_10': // VESPA results
+                    // This would need proper filter mapping
+                    console.warn("VESPA results should be fetched via school statistics");
+                    return [];
+                
+                case 'object_120': // national data
+                    const nationalStats = await this.getNationalStatistics();
+                    return nationalStats; // May need formatting
+                
+                default:
+                    console.error(`Unmapped object key: ${objectKey}`);
+                    return [];
+            }
+        },
+
+        // Updated dashboard initial data to use Supabase
+        async fetchDashboardInitialData(staffAdminId, establishmentId, cycle = 1) {
+            console.log("Fetching dashboard data from Supabase backend");
+            
+            try {
+                // Fetch school statistics
+                const schoolStats = await this.getSchoolStatistics(establishmentId, cycle);
+                
+                // Fetch national statistics
+                const nationalStats = await this.getNationalStatistics(cycle);
+                
+                // Fetch questions for mapping
+                const questions = await this.getQuestions();
+                
+                // Format response to match expected structure
+                return {
+                    schoolStatistics: schoolStats,
+                    nationalStatistics: nationalStats,
+                    questions: questions,
+                    cycle: cycle,
+                    establishmentId: establishmentId
+                };
+                
+            } catch (error) {
+                console.error("Failed to fetch dashboard initial data", error);
+                throw error;
+            }
+        },
+
+        // Calculate ERI using Supabase data
+        async calculateSchoolERI(staffAdminId, cycle, additionalFilters = [], establishmentId = null) {
+            if (!establishmentId) {
+                console.error("Establishment ID required for ERI calculation with Supabase");
+                return null;
+            }
+            
+            try {
+                // Get school statistics
+                const stats = await this.getSchoolStatistics(establishmentId, cycle);
+                
+                // Calculate ERI from VESPA means
+                if (stats && stats.length > 0) {
+                    const vespaElements = ['vision', 'effort', 'systems', 'practice', 'attitude'];
+                    let totalMean = 0;
+                    let count = 0;
+                    
+                    stats.forEach(stat => {
+                        if (stat.cycle === cycle && vespaElements.includes(stat.element)) {
+                            totalMean += stat.mean;
+                            count++;
+                        }
+                    });
+                    
+                    if (count === 5) {
+                        const eri = totalMean / count;
+                        return {
+                            value: Math.round(eri * 100) / 100,
+                            responseCount: stats[0].count || 0
+                        };
+                    }
+                }
+                
+                return null;
+                
+            } catch (error) {
+                console.error("Failed to calculate school ERI", error);
+                return null;
+            }
+        },
+
+        // Get national ERI from Supabase
+        async getNationalERI(cycle) {
+            try {
+                const nationalStats = await this.getNationalStatistics(cycle);
+                
+                if (nationalStats && nationalStats.length > 0) {
+                    const vespaElements = ['vision', 'effort', 'systems', 'practice', 'attitude'];
+                    let totalMean = 0;
+                    let count = 0;
+                    
+                    nationalStats.forEach(stat => {
+                        if (stat.cycle === cycle && vespaElements.includes(stat.element)) {
+                            totalMean += stat.mean;
+                            count++;
+                        }
+                    });
+                    
+                    if (count === 5) {
+                        return totalMean / count;
+                    }
+                }
+                
+                return 3.5; // Default fallback
+                
+            } catch (error) {
+                console.error("Failed to get national ERI", error);
+                return 3.5;
+            }
+        },
+
+        // Check if user is a super user
+        async checkSuperUser(email) {
+            const config = this.getConfig();
+            const url = `${config.herokuAppUrl}/api/check-super-user?email=${encodeURIComponent(email)}`;
+            
+            console.log("Checking super user status for:", email);
+            
+            try {
+                const response = await fetch(url);
+                const data = await this.handleResponse(response);
+                return data;
+            } catch (error) {
+                console.error("Failed to check super user status", error);
+                return {
+                    is_super_user: false,
+                    user: null
+                };
+            }
+        }
+    };
+
     // --- Knack API Helper ---
     // You'll need functions to fetch data from Knack.
     // These will typically use your Heroku app as a proxy to securely call the Knack API.
@@ -532,28 +846,41 @@ function initializeDashboardApp() {
         }
     }
 
-    // New function to check if user is a Super User (from object_21)
+    // New function to check if user is a Super User (from Supabase)
     async function checkSuperUserStatus(userEmail) {
         if (!userEmail) {
             errorLog("User email not provided to checkSuperUserStatus.");
             return null;
         }
 
-        const filters = [{
-            field: 'field_86', // Assuming email field in object_21 is also field_86
-            operator: 'is',
-            value: userEmail
-        }];
-
         try {
-            log(`Checking Super User status for email: ${userEmail}`);
-            const superUserRecords = await fetchDataFromKnack(objectKeys.superUserRoles || 'object_21', filters);
-            if (superUserRecords && superUserRecords.length > 0) {
-                log("Found Super User record:", superUserRecords[0]);
-                return superUserRecords[0].id;
+            log(`Checking Super User status in Supabase for email: ${userEmail}`);
+            
+            // Use the API object to check super user status
+            const result = await API.checkSuperUser(userEmail);
+            
+            if (result.is_super_user) {
+                log("Found Super User in Supabase:", result.user);
+                return result.user.knack_id || result.user.id;
             } else {
-                log("No Super User record found for email:", userEmail);
-                return null;
+                log("No Super User record found in Supabase for email:", userEmail);
+                
+                // Fall back to checking Knack if not found in Supabase
+                const filters = [{
+                    field: 'field_86', // Assuming email field in object_21 is also field_86
+                    operator: 'is',
+                    value: userEmail
+                }];
+                
+                log("Falling back to check Super User status in Knack");
+                const superUserRecords = await fetchDataFromKnack(objectKeys.superUserRoles || 'object_21', filters);
+                if (superUserRecords && superUserRecords.length > 0) {
+                    log("Found Super User record in Knack:", superUserRecords[0]);
+                    return superUserRecords[0].id;
+                } else {
+                    log("No Super User record found in Knack for email:", userEmail);
+                    return null;
+                }
             }
         } catch (error) {
             errorLog(`Error checking Super User status for email ${userEmail}:`, error);
@@ -566,16 +893,8 @@ function initializeDashboardApp() {
         try {
             log("Fetching schools from Supabase backend");
             
-            // Use the new Supabase schools endpoint
-            const url = `${config.herokuAppUrl}/api/schools`;
-            log("Fetching from Supabase schools endpoint:", url);
-            
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`Failed to fetch schools: ${response.status}`);
-            }
-            
-            const data = await response.json();
+            // Use the API object to get schools
+            const data = await API.getSchools();
             log(`Fetched ${data.length} schools from Supabase`);
             
             // Map the data to match expected format
