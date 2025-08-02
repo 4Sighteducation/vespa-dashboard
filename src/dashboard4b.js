@@ -943,7 +943,22 @@ function initializeDashboardApp() {
                     log("Warning: Multiple Staff Admin records found for email:", userEmail, "Using the first one.");
                 }
                 log("Found Staff Admin record:", staffAdminRecords[0]);
-                return staffAdminRecords[0].id; // Return the Record ID of the object_5 record
+                
+                // Extract establishment ID from the Staff Admin record
+                // field_70 is the Establishment connection field in object_5
+                let establishmentId = null;
+                if (staffAdminRecords[0].field_70_raw && staffAdminRecords[0].field_70_raw.length > 0) {
+                    establishmentId = staffAdminRecords[0].field_70_raw[0].id;
+                    log("Found establishment ID from Staff Admin record:", establishmentId);
+                } else {
+                    errorLog("No establishment connected to Staff Admin record");
+                }
+                
+                // Return both the record ID and establishment ID
+                return {
+                    recordId: staffAdminRecords[0].id,
+                    establishmentId: establishmentId
+                };
             } else {
                 errorLog(`No Staff Admin record found in ${objectKeys.staffAdminRoles} for email: ${userEmail}`);
                 return null;
@@ -4835,12 +4850,12 @@ function initializeDashboardApp() {
             const activeFilters = getActiveFilters();
             let schoolResults = [];
             
-            const staffAdminId = await getStaffAdminRecordIdByEmail(loggedInUserEmail);
-            if (staffAdminId) {
+            const staffAdminData = await getStaffAdminRecordIdByEmail(loggedInUserEmail);
+            if (staffAdminData) {
                 const filters = [{
                     field: 'field_439',
                     operator: 'is',
-                    value: staffAdminId
+                    value: staffAdminData.recordId
                 }, ...activeFilters];
                 
                 schoolResults = await fetchDataFromKnack(objectKeys.vespaResults, filters);
@@ -7628,13 +7643,16 @@ function initializeDashboardApp() {
 
         // --- New Logic: Prioritize Staff Admin check ---
         let staffAdminRecordId = null;
+        let staffAdminEstablishmentId = null;
         let isStaffAdmin = false;
 
         try {
-            staffAdminRecordId = await getStaffAdminRecordIdByEmail(loggedInUserEmail);
-            if (staffAdminRecordId) {
+            const staffAdminData = await getStaffAdminRecordIdByEmail(loggedInUserEmail);
+            if (staffAdminData) {
+                staffAdminRecordId = staffAdminData.recordId;
+                staffAdminEstablishmentId = staffAdminData.establishmentId;
                 isStaffAdmin = true;
-                log("User is a Staff Admin! Staff Admin Record ID:", staffAdminRecordId);
+                log("User is a Staff Admin! Record ID:", staffAdminRecordId, "Establishment ID:", staffAdminEstablishmentId);
             } else {
                 log("User is NOT a Staff Admin.");
             }
@@ -7716,7 +7734,7 @@ function initializeDashboardApp() {
                 
                 // Fetch all initial data using batch endpoint
                 GlobalLoader.updateProgress(30, 'Loading dashboard data...');
-                const batchData = await fetchDashboardInitialData(staffAdminRecordId, null, initialCycle);
+                const batchData = await fetchDashboardInitialData(staffAdminRecordId, staffAdminEstablishmentId, initialCycle);
                 
                 // Populate filter dropdowns from cached data
                 GlobalLoader.updateProgress(50, 'Setting up filters...');
@@ -7724,7 +7742,7 @@ function initializeDashboardApp() {
                 
                 // Load overview section first, then other sections
                 GlobalLoader.updateProgress(70, 'Rendering dashboard...');
-                await loadOverviewData(staffAdminRecordId, initialCycle);
+                await loadOverviewData(staffAdminRecordId, initialCycle, [], staffAdminEstablishmentId);
                 
                 // Add print report button after dashboard loads
                 addPrintReportButton();
@@ -7736,8 +7754,8 @@ function initializeDashboardApp() {
                 setTimeout(async () => {
                     try {
                         await Promise.all([
-                            loadQLAData(staffAdminRecordId, null, null, [], initialCycle),
-                            loadStudentCommentInsights(staffAdminRecordId, null, null, [], initialCycle)
+                            loadQLAData(staffAdminRecordId, null, staffAdminEstablishmentId, [], initialCycle),
+                            loadStudentCommentInsights(staffAdminRecordId, null, staffAdminEstablishmentId, [], initialCycle)
                         ]);
                     } catch (error) {
                         errorLog("Error loading secondary sections", error);
@@ -7995,3 +8013,4 @@ if (document.readyState === 'loading') {
 } else {
     // initializeDashboardApp(); // Or call if DOM is already ready, though WorkingBridge is preferred.
 }
+
