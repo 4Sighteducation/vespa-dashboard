@@ -938,7 +938,7 @@ function initializeDashboardApp() {
         try {
             log(`Fetching Staff Admin record from Supabase for email: ${userEmail}`);
             
-            const config = api.getConfig();
+            const config = API.getConfig();
             const response = await fetch(`${config.herokuAppUrl}/api/staff-admin/${encodeURIComponent(userEmail)}`);
             
             if (!response.ok) {
