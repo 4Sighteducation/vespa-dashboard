@@ -341,15 +341,12 @@ function initializeDashboardApp() {
         // Get school statistics
         async getSchoolStatistics(schoolId, cycle = null, academicYear = null) {
             const config = this.getConfig();
-            let url = `${config.herokuAppUrl}/api/statistics/${schoolId}`;
-            
             const params = new URLSearchParams();
+            params.append('establishment_id', schoolId);
             if (cycle) params.append('cycle', cycle);
             if (academicYear) params.append('academic_year', academicYear);
             
-            if (params.toString()) {
-                url += `?${params.toString()}`;
-            }
+            let url = `${config.herokuAppUrl}/api/statistics?${params.toString()}`;
             
             console.log("Fetching school statistics from Supabase:", url);
             
