@@ -6,15 +6,20 @@
 function initializeDashboardApp() {
     console.log('Initializing VESPA Dashboard v2 (Supabase Edition)');
     
-    // Configuration
+    // Configuration from loader
     const config = window.DASHBOARD_CONFIG || {
         herokuAppUrl: 'https://vespa-dashboard-9a1f84ee5341.herokuapp.com',
-        debugMode: true
+        debugMode: true,
+        elementSelector: '#view_3058'
     };
+    
+    // Log the config to debug
+    console.log('[Dashboard v2] Config:', config);
     
     // Current state
     let currentUser = null;
     let currentEstablishment = null;
+    let currentEstablishmentName = null;
     let currentCycle = 1;
     let isSuperUser = false;
     let isStaffAdmin = false;
@@ -70,9 +75,47 @@ function initializeDashboardApp() {
         }
     };
     
+    // Get the Knack view container  
+    function ensureContainer() {
+        // The dashboard is configured to load in view_3058
+        let container = document.querySelector('#view_3058');
+        
+        if (!container) {
+            // Try alternative selectors
+            container = document.querySelector('[id="view_3058"]') ||
+                       document.querySelector('.view_3058') ||
+                       document.querySelector('[data-view-key="view_3058"]');
+        }
+        
+        if (!container) {
+            error('Container view_3058 not found! Dashboard cannot load.');
+            // Last resort - find any view in the scene
+            container = document.querySelector('#kn-scene_1225 .kn-view');
+        }
+        
+        if (container) {
+            log('Found container:', container.id || container.className);
+            // Clear any existing content in the view
+            container.innerHTML = '';
+        } else {
+            error('No suitable container found for dashboard');
+        }
+        
+        return container;
+    }
+    
     // Initialize dashboard
     async function init() {
         try {
+            // Wait a moment for Knack to finish rendering
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Ensure container exists
+            const container = ensureContainer();
+            if (!container) {
+                throw new Error('Dashboard container not found');
+            }
+            
             // Get current user
             currentUser = Knack.getUserAttributes();
             if (!currentUser) {
@@ -81,21 +124,50 @@ function initializeDashboardApp() {
             }
             
             log('Current user:', currentUser);
-            const userEmail = currentUser.email;
+            const userEmail = currentUser.email || config.loggedInUserEmail;
+            
+            if (!userEmail) {
+                error('No user email found');
+                showError('Unable to identify user. Please refresh the page.');
+                return;
+            }
+            
+            log('Checking user roles for:', userEmail);
             
             // Check user role
             const [staffAdminCheck, superUserCheck] = await Promise.all([
-                API.getStaffAdmin(userEmail).catch(() => null),
+                API.getStaffAdmin(userEmail).catch(err => {
+                    log('Staff admin check failed:', err);
+                    return null;
+                }),
                 API.checkSuperUser(userEmail)
             ]);
             
+            log('Staff admin check:', staffAdminCheck);
+            log('Super user check:', superUserCheck);
+            
             if (staffAdminCheck && staffAdminCheck.field_110_raw?.length > 0) {
                 isStaffAdmin = true;
-                currentEstablishment = staffAdminCheck.field_110_raw[0].id;
-                log('User is Staff Admin for establishment:', currentEstablishment);
+                const knackEstablishmentId = staffAdminCheck.field_110_raw[0].id;
+                const establishmentName = staffAdminCheck.field_110_raw[0].identifier;
                 
-                // Load dashboard for their school
-                await loadDashboard(currentEstablishment);
+                log('User is Staff Admin for Knack establishment:', knackEstablishmentId);
+                
+                // Get Supabase establishment ID
+                const schools = await API.getSchools();
+                const establishment = schools.find(s => s.knack_id === knackEstablishmentId);
+                
+                if (establishment) {
+                    currentEstablishment = establishment.id;
+                    currentEstablishmentName = establishment.name || establishmentName;
+                    log('Found Supabase establishment:', currentEstablishment);
+                    
+                    // Load dashboard for their school
+                    await loadDashboard(currentEstablishment);
+                } else {
+                    error('Could not find establishment in Supabase');
+                    showError('Your school could not be found. Please contact support.');
+                }
                 
             } else if (superUserCheck.is_super_user) {
                 isSuperUser = true;
@@ -117,7 +189,7 @@ function initializeDashboardApp() {
     
     // Show school selector for super users
     async function showSchoolSelector() {
-        const container = document.getElementById('dashboard-container');
+        const container = ensureContainer();
         container.innerHTML = `
             <div class="super-user-controls">
                 <div class="super-user-header">
@@ -153,7 +225,9 @@ function initializeDashboardApp() {
             document.getElementById('load-school-btn').addEventListener('click', async () => {
                 const schoolId = select.value;
                 if (schoolId) {
+                    const selectedSchool = schools.find(s => s.id === schoolId);
                     currentEstablishment = schoolId;
+                    currentEstablishmentName = selectedSchool?.name || 'School';
                     await loadDashboard(schoolId);
                 }
             });
@@ -212,7 +286,7 @@ function initializeDashboardApp() {
         // Build dashboard HTML
         container.innerHTML = `
             <header>
-                <h1>VESPA Dashboard - ${schoolData.establishment_name || 'School'}</h1>
+                <h1>VESPA Dashboard - ${currentEstablishmentName || 'School'}</h1>
                 <div class="controls">
                     <div class="controls-left">
                         <label for="cycle-select">Cycle:</label>
@@ -397,7 +471,7 @@ function initializeDashboardApp() {
     
     // Show error message
     function showError(message) {
-        const container = document.getElementById('dashboard-container');
+        const container = ensureContainer();
         container.innerHTML = `
             <div class="error-message">
                 <h2>Error</h2>
