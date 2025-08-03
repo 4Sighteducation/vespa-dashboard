@@ -1,4 +1,4 @@
-// dashboard2x.js
+/// dashboard2x.js
 // @ts-nocheck
 
 // lobal loader management
@@ -341,12 +341,15 @@ function initializeDashboardApp() {
         // Get school statistics
         async getSchoolStatistics(schoolId, cycle = null, academicYear = null) {
             const config = this.getConfig();
+            let url = `${config.herokuAppUrl}/api/statistics/${schoolId}`;
+            
             const params = new URLSearchParams();
-            params.append('establishment_id', schoolId);
             if (cycle) params.append('cycle', cycle);
             if (academicYear) params.append('academic_year', academicYear);
             
-            let url = `${config.herokuAppUrl}/api/statistics?${params.toString()}`;
+            if (params.toString()) {
+                url += `?${params.toString()}`;
+            }
             
             console.log("Fetching school statistics from Supabase:", url);
             
@@ -864,7 +867,7 @@ function initializeDashboardApp() {
                 
                 // Fall back to checking Knack if not found in Supabase
                 const filters = [{
-                    field: 'field_473', // Email field in object_21 (Super Users)
+                    field: 'field_86', // Assuming email field in object_21 is also field_86
                     operator: 'is',
                     value: userEmail
                 }];
@@ -933,37 +936,33 @@ function initializeDashboardApp() {
         }];
 
         try {
-            log(`Fetching Staff Admin record from Supabase for email: ${userEmail}`);
-            
-            const config = API.getConfig();
-            const response = await fetch(`${config.herokuAppUrl}/api/staff-admin/${encodeURIComponent(userEmail)}`);
-            
-            if (!response.ok) {
-                if (response.status === 404) {
-                    errorLog(`No Staff Admin record found for email: ${userEmail}`);
-                } else {
-                    errorLog(`Error fetching Staff Admin record: ${response.statusText}`);
+            log(`Fetching Staff Admin record from ${objectKeys.staffAdminRoles} for email: ${userEmail}`);
+            const staffAdminRecords = await fetchDataFromKnack(objectKeys.staffAdminRoles, filters);
+            if (staffAdminRecords && staffAdminRecords.length > 0) {
+                if (staffAdminRecords.length > 1) {
+                    log("Warning: Multiple Staff Admin records found for email:", userEmail, "Using the first one.");
                 }
+                log("Found Staff Admin record:", staffAdminRecords[0]);
+                
+                // Extract establishment ID from the Staff Admin record
+                // field_70 is the Establishment connection field in object_5
+                let establishmentId = null;
+                if (staffAdminRecords[0].field_70_raw && staffAdminRecords[0].field_70_raw.length > 0) {
+                    establishmentId = staffAdminRecords[0].field_70_raw[0].id;
+                    log("Found establishment ID from Staff Admin record:", establishmentId);
+                } else {
+                    errorLog("No establishment connected to Staff Admin record");
+                }
+                
+                // Return both the record ID and establishment ID
+                return {
+                    recordId: staffAdminRecords[0].id,
+                    establishmentId: establishmentId
+                };
+            } else {
+                errorLog(`No Staff Admin record found in ${objectKeys.staffAdminRoles} for email: ${userEmail}`);
                 return null;
             }
-            
-            const staffAdminRecord = await response.json();
-            log("Found Staff Admin record:", staffAdminRecord);
-            
-            // Extract establishment ID from the Staff Admin record
-            let establishmentId = null;
-            if (staffAdminRecord.field_110_raw && staffAdminRecord.field_110_raw.length > 0) {
-                establishmentId = staffAdminRecord.field_110_raw[0].id;
-                log("Found establishment ID from Staff Admin record:", establishmentId);
-            } else {
-                errorLog("No establishment connected to Staff Admin record");
-            }
-            
-            // Return both the record ID and establishment ID
-            return {
-                recordId: staffAdminRecord.id,
-                establishmentId: establishmentId
-            };
         } catch (error) {
             errorLog(`Error fetching Staff Admin record for email ${userEmail}:`, error);
             return null;
@@ -8013,4 +8012,3 @@ if (document.readyState === 'loading') {
     });
 } else {
     // initializeDashboardApp(); // Or call if DOM is already ready, though WorkingBridge is preferred.
-}
